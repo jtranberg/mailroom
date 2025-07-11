@@ -1,0 +1,37 @@
+.container {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 1rem;
+  font-family: sans-serif;
+  text-align: center;
+}
+
+.button-group button {
+  margin: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.viewer {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f9f9f9;
+  border: 1px dashed #ccc;
+}
+
+.send-button {
+  margin-top: 1rem;
+  padding: 0.7rem 1.5rem;
+  font-size: 1.1rem;
+  background: #0077ff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.status {
+  margin-top: 1rem;
+  font-style: italic;
+}
