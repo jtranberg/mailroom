@@ -8,6 +8,8 @@ import path from 'path';
 import fs from 'fs';
 import Document from './models/Document.js';
 import Tenant from './models/Tenant.js'; // ⬅️ add this near the top
+import Property from './models/Property.js';
+
 
 dotenv.config();
 
@@ -145,6 +147,17 @@ app.get('/api/tenants', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch tenants', details: err.message });
   }
 });
+// GET: Fetch all properties
+app.get('/api/properties', async (req, res) => {
+  try {
+    const properties = await Property.find();
+    res.json(properties);
+  } catch (err) {
+    console.error('❌ Failed to fetch properties:', err);
+    res.status(500).json({ error: 'Failed to fetch properties', details: err.message });
+  }
+});
+
 
 
 
