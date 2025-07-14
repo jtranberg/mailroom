@@ -171,6 +171,17 @@ app.post('/api/properties', async (req, res) => {
   }
 });
 
+// GET: Fetch all properties
+app.get('/api/properties', async (req, res) => {
+  try {
+    const properties = await Property.find();
+    res.status(200).json(properties);
+  } catch (err) {
+    console.error('❌ Failed to fetch properties:', err);
+    res.status(500).json({ error: 'Failed to fetch properties', details: err.message });
+  }
+});
+
 
 
 
