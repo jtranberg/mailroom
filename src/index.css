@@ -25,10 +25,15 @@ a:hover {
 body {
   margin: 0;
   display: flex;
-  place-items: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* or center if you want full vertical centering */
   min-width: 320px;
   min-height: 100vh;
+  padding-top: 100px; /* for space under fixed header, if applicable */
+  background: #f9fafb; /* light background for contrast */
 }
+
 
 h1 {
   font-size: 3.2em;

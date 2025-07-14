@@ -1,37 +1,87 @@
+/* === Container Layout === */
 .container {
   max-width: 600px;
-  margin: 2rem auto;
-  padding: 1rem;
-  font-family: sans-serif;
+  margin: 4rem auto;
+  padding: 1.5rem;
+  font-family: system-ui, sans-serif;
   text-align: center;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* === Button Group === */
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
 }
 
 .button-group button {
-  margin: 0.5rem;
   padding: 0.6rem 1.2rem;
   font-size: 1rem;
-  cursor: pointer;
-}
-
-.viewer {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: #f9f9f9;
-  border: 1px dashed #ccc;
-}
-
-.send-button {
-  margin-top: 1rem;
-  padding: 0.7rem 1.5rem;
-  font-size: 1.1rem;
   background: #0077ff;
   color: white;
   border: none;
+  border-radius: 6px;
   cursor: pointer;
-  border-radius: 4px;
+  transition: background 0.2s ease-in-out;
 }
 
+.button-group button:hover {
+  background: #005dd1;
+}
+
+/* === Viewer === */
+.viewer {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f1f5f9;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  word-wrap: break-word;
+}
+
+/* === Send Button === */
+.send-button {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  background: #10b981;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s ease-in-out;
+}
+
+.send-button:hover {
+  background: #059669;
+}
+
+/* === Status Message === */
 .status {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   font-style: italic;
+  font-size: 0.95rem;
+  color: #64748b;
+}
+
+/* === Responsive Tweaks === */
+@media (max-width: 480px) {
+  .container {
+    margin: 2rem 1rem;
+    padding: 1rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .send-button {
+    width: 100%;
+  }
 }
