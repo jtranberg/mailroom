@@ -112,6 +112,8 @@ textarea, input {
     width: 100%;
   }
 }
+
+/* Document Center Specific */
 .header-row {
   display: flex;
   justify-content: space-between;
@@ -133,5 +135,3 @@ textarea, input {
 .admin-link:hover {
   background-color: #34495e;
 }
-
-
