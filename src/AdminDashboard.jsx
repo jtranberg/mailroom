@@ -16,11 +16,12 @@ export default function AdminDashboard() {
   });
 
   const navigate = useNavigate();
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const fetchTenants = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/tenants');
+        const res = await fetch(`${API_BASE}/api/tenants`);
         const data = await res.json();
         if (res.ok) setTenants(data);
       } catch (err) {
@@ -29,7 +30,7 @@ export default function AdminDashboard() {
     };
 
     fetchTenants();
-  }, []);
+  }, [API_BASE]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://localhost:5000/api/documents', {
+      const res = await fetch(`${API_BASE}/api/documents`, {
         method: 'POST',
         body: formData
       });
@@ -74,7 +75,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/tenants', {
+      const res = await fetch(`${API_BASE}/api/tenants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

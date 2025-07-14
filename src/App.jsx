@@ -12,14 +12,15 @@ export default function App() {
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = useNavigate();
 
+  const navigate = useNavigate();
   const ADMIN_SECRET = 'wallsecure';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/documents');
+        const res = await fetch(`${API_BASE}/api/documents`);
         const data = await res.json();
         setDocuments(data);
       } catch (err) {
@@ -29,7 +30,7 @@ export default function App() {
 
     const fetchTenants = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/tenants');
+        const res = await fetch(`${API_BASE}/api/tenants`);
         const tenantList = await res.json();
 
         // Group tenants by propertyId
@@ -37,11 +38,7 @@ export default function App() {
         tenantList.forEach(tenant => {
           const key = tenant.propertyId;
           if (!grouped[key]) {
-            grouped[key] = {
-              id: key,
-              name: key,
-              tenants: []
-            };
+            grouped[key] = { id: key, name: key, tenants: [] };
           }
           grouped[key].tenants.push({
             id: tenant._id,
@@ -59,7 +56,7 @@ export default function App() {
 
     fetchDocuments();
     fetchTenants();
-  }, []);
+  }, [API_BASE]);
 
   const handlePropertySelect = (property) => {
     setSelectedProperty(property);
@@ -81,9 +78,10 @@ export default function App() {
 
   const handleSend = () => {
     if (!selectedTenant || !selectedDoc) return;
-    setStatus(`Sending ${selectedDoc} for ${selectedTenant.name} (${selectedTenant.email})...`);
+    setStatus(`📤 Sending ${selectedDoc} to ${selectedTenant.name} (${selectedTenant.email})...`);
+    // Future: Integrate actual email logic
     setTimeout(() => {
-      setStatus('✅ Document saved and sent to admin!');
+      setStatus('✅ Document sent to tenant and admin.');
     }, 1500);
   };
 
@@ -140,7 +138,7 @@ export default function App() {
           <div className="button-group">
             {selectedProperty.tenants.map(tenant => (
               <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
-                {tenant.name} - Unit {tenant.unit}
+                {tenant.name} – Unit {tenant.unit}
               </button>
             ))}
           </div>
@@ -163,10 +161,10 @@ export default function App() {
       {selectedDoc && selectedTenant && (
         <div className="viewer">
           <h3>{selectedDoc.toUpperCase()} Document</h3>
-          <p><em>PDF for: {selectedTenant.name} ({selectedTenant.unit})</em></p>
+          <p><em>PDF for: {selectedTenant.name} (Unit {selectedTenant.unit})</em></p>
           <p><em>[PDF Viewer Placeholder]</em></p>
           <button className="send-button" onClick={handleSend}>
-            💾 Save & Send to Admin
+            💾 Save & Send to Tenant
           </button>
         </div>
       )}
