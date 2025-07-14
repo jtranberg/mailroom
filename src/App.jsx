@@ -1,35 +1,83 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './App.css';
 
-const properties = [
-  {
-    id: 'prop1',
-    name: 'Sunset Villas',
-    tenants: [
-      { id: 't1', name: 'Jane Doe', email: 'jane@example.com', unit: '202A' },
-      { id: 't2', name: 'John Smith', email: 'john@example.com', unit: '104B' },
-    ],
-  },
-  {
-    id: 'prop2',
-    name: 'Maple Apartments',
-    tenants: [
-      { id: 't3', name: 'Alice Green', email: 'alice@maple.com', unit: '3C' },
-    ],
-  },
-];
-
-const documents = [
-  { id: 'lease', label: 'View Lease Agreement' },
-  { id: 'maintenance', label: 'Maintenance Request' },
-  { id: 'inspection', label: 'Inspection Form' },
-];
-
 export default function App() {
+  const [documents, setDocuments] = useState([]);
+  const [properties, setProperties] = useState([]);
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [status, setStatus] = useState('');
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const ADMIN_SECRET = 'wallsecure';
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/documents');
+        const data = await res.json();
+        setDocuments(data);
+      } catch (err) {
+        console.error('❌ Failed to fetch documents:', err);
+      }
+    };
+
+    const fetchTenants = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/tenants');
+        const tenantList = await res.json();
+
+        // Group tenants by propertyId
+        const grouped = {};
+        tenantList.forEach(tenant => {
+          const key = tenant.propertyId;
+          if (!grouped[key]) {
+            grouped[key] = {
+              id: key,
+              name: key,
+              tenants: []
+            };
+          }
+          grouped[key].tenants.push({
+            id: tenant._id,
+            name: tenant.name,
+            email: tenant.email,
+            unit: tenant.unit
+          });
+        });
+
+        setProperties(Object.values(grouped));
+      } catch (err) {
+        console.error('❌ Failed to fetch tenants:', err);
+      }
+    };
+
+    fetchDocuments();
+    fetchTenants();
+  }, []);
+
+  const handlePropertySelect = (property) => {
+    setSelectedProperty(property);
+    setSelectedTenant(null);
+    setSelectedDoc(null);
+    setStatus('');
+  };
+
+  const handleTenantSelect = (tenant) => {
+    setSelectedTenant(tenant);
+    setSelectedDoc(null);
+    setStatus('');
+  };
+
+  const handleDocumentSelect = (docType) => {
+    setSelectedDoc(docType);
+    setStatus('');
+  };
 
   const handleSend = () => {
     if (!selectedTenant || !selectedDoc) return;
@@ -39,23 +87,49 @@ export default function App() {
     }, 1500);
   };
 
+  const handleAdminClick = () => {
+    setShowPasswordPrompt(true);
+    setError('');
+  };
+
+  const handlePasswordSubmit = () => {
+    if (adminPassword === ADMIN_SECRET) {
+      navigate('/admin');
+    } else {
+      setError('❌ Incorrect password');
+    }
+  };
+
   return (
     <div className="container">
-      <h1>📄 Document Center</h1>
+      <div className="header-row">
+        <h1>📄 Document Center</h1>
+        <button className="admin-link" onClick={handleAdminClick}>Admin Dashboard</button>
+      </div>
+      <p className="subtext">🧾 {documents.length} documents loaded</p>
+
+      {showPasswordPrompt && (
+        <div className="password-modal">
+          <h3>🔐 Enter Admin Password</h3>
+          <input
+            type="password"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            placeholder="Enter password..."
+          />
+          <div className="modal-buttons">
+            <button onClick={handlePasswordSubmit}>Login</button>
+            <button onClick={() => setShowPasswordPrompt(false)}>Cancel</button>
+          </div>
+          {error && <p className="error-text">{error}</p>}
+        </div>
+      )}
 
       <h2>1. Choose Property</h2>
       <div className="button-group">
-        {properties.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => {
-              setSelectedProperty(p);
-              setSelectedTenant(null);
-              setSelectedDoc(null);
-              setStatus('');
-            }}
-          >
-            {p.name}
+        {properties.map(property => (
+          <button key={property.id} onClick={() => handlePropertySelect(property)}>
+            {property.name}
           </button>
         ))}
       </div>
@@ -64,9 +138,9 @@ export default function App() {
         <>
           <h2>2. Choose Tenant</h2>
           <div className="button-group">
-            {selectedProperty.tenants.map((t) => (
-              <button key={t.id} onClick={() => setSelectedTenant(t)}>
-                {t.name} - Unit {t.unit}
+            {selectedProperty.tenants.map(tenant => (
+              <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
+                {tenant.name} - Unit {tenant.unit}
               </button>
             ))}
           </div>
@@ -77,8 +151,8 @@ export default function App() {
         <>
           <h2>3. Choose Document</h2>
           <div className="button-group">
-            {documents.map((doc) => (
-              <button key={doc.id} onClick={() => setSelectedDoc(doc.id)}>
+            {documents.map(doc => (
+              <button key={doc._id} onClick={() => handleDocumentSelect(doc.type)}>
                 {doc.label}
               </button>
             ))}
@@ -89,9 +163,7 @@ export default function App() {
       {selectedDoc && selectedTenant && (
         <div className="viewer">
           <h3>{selectedDoc.toUpperCase()} Document</h3>
-          <p>
-            <em>PDF for: {selectedTenant.name} ({selectedTenant.unit})</em>
-          </p>
+          <p><em>PDF for: {selectedTenant.name} ({selectedTenant.unit})</em></p>
           <p><em>[PDF Viewer Placeholder]</em></p>
           <button className="send-button" onClick={handleSend}>
             💾 Save & Send to Admin
@@ -99,7 +171,7 @@ export default function App() {
         </div>
       )}
 
-      <p className="status">{status}</p>
+      {status && <p className="status">{status}</p>}
     </div>
   );
 }
