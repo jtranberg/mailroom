@@ -154,16 +154,23 @@ app.get('/api/tenants', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch tenants', details: err.message });
   }
 });
-// GET: Fetch all properties
-app.get('/api/properties', async (req, res) => {
+// POST: Add new property
+app.post('/api/properties', async (req, res) => {
   try {
-    const properties = await Property.find();
-    res.json(properties);
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'Missing property name' });
+    }
+
+    const newProperty = new Property({ name });
+    await newProperty.save();
+    res.status(201).json({ message: '✅ Property added', property: newProperty });
   } catch (err) {
-    console.error('❌ Failed to fetch properties:', err);
-    res.status(500).json({ error: 'Failed to fetch properties', details: err.message });
+    console.error('❌ Failed to add property:', err);
+    res.status(500).json({ error: 'Failed to add property', details: err.message });
   }
 });
+
 
 
 
