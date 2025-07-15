@@ -139,7 +139,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="admin-container">
+    <div className="container">
       <div className="admin-header">
         <h2>🛠️ Admin Dashboard</h2>
         <button className="back-button" onClick={() => navigate('/')}>
