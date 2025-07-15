@@ -98,7 +98,6 @@ export default function App() {
     }
   };
 
-  // Lookup selected document from the list
   const selectedDocObj = documents.find((doc) => doc.type === selectedDoc);
 
   return (
@@ -177,7 +176,12 @@ export default function App() {
               src={`${API_BASE}/uploads/${selectedDocObj.filename}`}
               width="100%"
               height="500px"
-              style={{ border: "1px solid #ccc", borderRadius: "8px" }}
+              style={{
+                border: "1px solid var(--card-border)",
+                borderRadius: "10px",
+                background: "rgba(255, 255, 255, 0.02)",
+                backdropFilter: "blur(6px)",
+              }}
               title="PDF Viewer"
             />
           ) : (

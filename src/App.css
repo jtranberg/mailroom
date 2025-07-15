@@ -1,89 +1,102 @@
 :root {
   --primary: #1D70B7; /* Lochmara */
-  --secondary: #f1f5f9;
+  --secondary: #0f172a; /* Dark navy background */
   --accent: #8D7254; /* Shadow */
-  --text-dark: #3B3B3B; /* Tuatara */
+  --text-dark: #f1f5f9; /* Light on dark */
   --text-light: #ffffff;
-  --bg-white: #ffffff;
-  --shadow: rgba(0, 0, 0, 0.08);
+  --card-glass: rgba(28, 51, 224, 0.05);
+  --card-border: rgba(255, 255, 255, 0.15);
+  --shadow: rgba(0, 0, 0, 0.25);
 }
 
 body {
   margin: 0;
   font-family: 'Segoe UI', system-ui, sans-serif;
-  background: var(--secondary);
+  background: #0f172a;
   color: var(--text-dark);
   min-height: 100vh;
 }
 
+/* Container cards with glassmorphism */
 .container {
   width: 100%;
-  max-width: 600px;
-  margin: 4rem auto;
+  max-width: 700px;
+  margin: 6rem auto;
   padding: 2rem;
-  background: var(--bg-white);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px var(--shadow);
+  background: var(--card-glass);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px var(--shadow);
   box-sizing: border-box;
   text-align: center;
+  color: var(--text-dark);
 }
 
+/* Headings */
 h1, h2 {
   color: var(--primary);
-  margin-bottom: 1rem;
-  letter-spacing: 0.5px;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
 }
 
+/* Buttons (modern, clean) */
 button,
 .button-group button,
 .send-button {
   padding: 0.75rem 1.5rem;
-  margin: 0.5rem; 
+  margin: 0.5rem;
   background: var(--primary);
   color: var(--text-light);
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.25s ease-in-out;
+  transition: background 0.25s ease, transform 0.2s;
 }
 
 button:hover,
 .send-button:hover,
 .button-group button:hover {
-  background: #155a8a; /* darker primary */
+  background: #155a8a;
+  transform: translateY(-1px);
 }
 
+/* Inputs */
 textarea, input {
   width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
   padding: 0.8rem;
   font-size: 1rem;
-  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-light);
+  backdrop-filter: blur(6px);
   margin-top: 0.5rem;
-  background: #f9fbfc;
-  color: var(--text-dark);
 }
 
 textarea:focus,
 input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(29, 112, 183, 0.1);
+  box-shadow: 0 0 0 2px rgba(29, 112, 183, 0.3);
 }
 
+/* Status messages */
 .status {
   margin-top: 1.2rem;
   font-style: italic;
   font-size: 0.95rem;
-  color: #677D8B; /* Slate gray */
+  color: #94a3b8;
 }
 
+/* Modal */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -91,24 +104,43 @@ input:focus {
 }
 
 .modal {
-  background: var(--bg-white);
+  background: var(--card-glass);
+  border: 1px solid var(--card-border);
   padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
   max-width: 500px;
   width: 90%;
   color: var(--text-dark);
+  box-shadow: 0 6px 20px var(--shadow);
 }
 
+/* Admin link button */
+.admin-link {
+  background-color: var(--accent);
+  color: var(--text-light);
+  padding: 0.6em 1.2em;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.admin-link:hover {
+  background-color: #6f563f;
+}
+
+/* Responsive tweaks */
 @media (max-width: 600px) {
   .container {
-    margin: 2rem 1rem;
-    padding: 1rem;
+    margin: 3rem 1rem;
+    padding: 1.5rem;
   }
 
   .button-group {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
   .button-group button,
@@ -117,25 +149,42 @@ input:focus {
   }
 }
 
-/* Document Center Specific */
-.header-row {
+.subtext {
+  color: #94a3b8;
+  font-style: italic;
+  margin-bottom: 1.5rem;
+}
+
+.viewer {
+  background: var(--card-glass);
+  border: 1px solid var(--card-border);
+  padding: 1.5rem;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  margin-top: 2rem;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+.password-modal {
+  background: var(--card-glass);
+  border: 1px solid var(--card-border);
+  padding: 2rem;
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  margin-top: 2rem;
+  box-shadow: 0 6px 20px var(--shadow);
+  color: var(--text-dark);
+}
+
+.modal-buttons {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
-.admin-link {
-  background-color: var(--accent);
-  color: var(--text-light);
-  border: none;
-  padding: 0.5em 1em;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.3s ease;
-}
-
-.admin-link:hover {
-  background-color: #6f563f; /* darker shadow */
+.error-text {
+  color: #ef4444;
+  font-size: 0.9rem;
+  margin-top: 1rem;
 }
