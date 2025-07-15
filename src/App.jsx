@@ -162,7 +162,14 @@ export default function App() {
         <div className="viewer">
           <h3>{selectedDoc.toUpperCase()} Document</h3>
           <p><em>PDF for: {selectedTenant.name} (Unit {selectedTenant.unit})</em></p>
-          <p><em>[PDF Viewer Placeholder]</em></p>
+          <iframe
+  src={`${API_BASE}/documents/${selectedDoc}.pdf`}
+  width="100%"
+  height="500px"
+  style={{ border: '1px solid #ccc', borderRadius: '8px' }}
+  title="PDF Viewer"
+/>
+
           <button className="send-button" onClick={handleSend}>
             💾 Save & Send to Tenant
           </button>
