@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import './App.css';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import "./App.css";
 
 export default function App() {
   const [documents, setDocuments] = useState([]);
@@ -8,14 +8,14 @@ export default function App() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [selectedDoc, setSelectedDoc] = useState(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState("");
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [error, setError] = useState('');
+  const [adminPassword, setAdminPassword] = useState("");
+  const [error, setError] = useState("");
 
   const navigate = useNavigate();
-  const ADMIN_SECRET = 'wallsecure';
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const ADMIN_SECRET = "wallsecure";
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -24,7 +24,7 @@ export default function App() {
         const data = await res.json();
         setDocuments(data);
       } catch (err) {
-        console.error('❌ Failed to fetch documents:', err);
+        console.error("❌ Failed to fetch documents:", err);
       }
     };
 
@@ -33,9 +33,8 @@ export default function App() {
         const res = await fetch(`${API_BASE}/api/tenants`);
         const tenantList = await res.json();
 
-        // Group tenants by propertyId
         const grouped = {};
-        tenantList.forEach(tenant => {
+        tenantList.forEach((tenant) => {
           const key = tenant.propertyId;
           if (!grouped[key]) {
             grouped[key] = { id: key, name: key, tenants: [] };
@@ -44,13 +43,13 @@ export default function App() {
             id: tenant._id,
             name: tenant.name,
             email: tenant.email,
-            unit: tenant.unit
+            unit: tenant.unit,
           });
         });
 
         setProperties(Object.values(grouped));
       } catch (err) {
-        console.error('❌ Failed to fetch tenants:', err);
+        console.error("❌ Failed to fetch tenants:", err);
       }
     };
 
@@ -62,47 +61,53 @@ export default function App() {
     setSelectedProperty(property);
     setSelectedTenant(null);
     setSelectedDoc(null);
-    setStatus('');
+    setStatus("");
   };
 
   const handleTenantSelect = (tenant) => {
     setSelectedTenant(tenant);
     setSelectedDoc(null);
-    setStatus('');
+    setStatus("");
   };
 
   const handleDocumentSelect = (docType) => {
     setSelectedDoc(docType);
-    setStatus('');
+    setStatus("");
   };
 
   const handleSend = () => {
     if (!selectedTenant || !selectedDoc) return;
-    setStatus(`📤 Sending ${selectedDoc} to ${selectedTenant.name} (${selectedTenant.email})...`);
-    // Future: Integrate actual email logic
+    setStatus(
+      `📤 Sending ${selectedDoc} to ${selectedTenant.name} (${selectedTenant.email})...`
+    );
     setTimeout(() => {
-      setStatus('✅ Document sent to tenant and admin.');
+      setStatus("✅ Document sent to tenant and admin.");
     }, 1500);
   };
 
   const handleAdminClick = () => {
     setShowPasswordPrompt(true);
-    setError('');
+    setError("");
   };
 
   const handlePasswordSubmit = () => {
     if (adminPassword === ADMIN_SECRET) {
-      navigate('/admin');
+      navigate("/admin");
     } else {
-      setError('❌ Incorrect password');
+      setError("❌ Incorrect password");
     }
   };
+
+  // Lookup selected document from the list
+  const selectedDocObj = documents.find((doc) => doc.type === selectedDoc);
 
   return (
     <div className="container">
       <div className="header-row">
         <h1>📄 Document Center</h1>
-        <button className="admin-link" onClick={handleAdminClick}>Admin Dashboard</button>
+        <button className="admin-link" onClick={handleAdminClick}>
+          Admin Dashboard
+        </button>
       </div>
       <p className="subtext">🧾 {documents.length} documents loaded</p>
 
@@ -125,7 +130,7 @@ export default function App() {
 
       <h2>1. Choose Property</h2>
       <div className="button-group">
-        {properties.map(property => (
+        {properties.map((property) => (
           <button key={property.id} onClick={() => handlePropertySelect(property)}>
             {property.name}
           </button>
@@ -136,7 +141,7 @@ export default function App() {
         <>
           <h2>2. Choose Tenant</h2>
           <div className="button-group">
-            {selectedProperty.tenants.map(tenant => (
+            {selectedProperty.tenants.map((tenant) => (
               <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
                 {tenant.name} – Unit {tenant.unit}
               </button>
@@ -149,7 +154,7 @@ export default function App() {
         <>
           <h2>3. Choose Document</h2>
           <div className="button-group">
-            {documents.map(doc => (
+            {documents.map((doc) => (
               <button key={doc._id} onClick={() => handleDocumentSelect(doc.type)}>
                 {doc.label}
               </button>
@@ -161,14 +166,23 @@ export default function App() {
       {selectedDoc && selectedTenant && (
         <div className="viewer">
           <h3>{selectedDoc.toUpperCase()} Document</h3>
-          <p><em>PDF for: {selectedTenant.name} (Unit {selectedTenant.unit})</em></p>
-          <iframe
-  src={`${API_BASE}/documents/${selectedDoc}.pdf`}
-  width="100%"
-  height="500px"
-  style={{ border: '1px solid #ccc', borderRadius: '8px' }}
-  title="PDF Viewer"
-/>
+          <p>
+            <em>
+              PDF for: {selectedTenant.name} (Unit {selectedTenant.unit})
+            </em>
+          </p>
+
+          {selectedDocObj?.filename ? (
+            <iframe
+              src={`${API_BASE}/uploads/${selectedDocObj.filename}`}
+              width="100%"
+              height="500px"
+              style={{ border: "1px solid #ccc", borderRadius: "8px" }}
+              title="PDF Viewer"
+            />
+          ) : (
+            <p>📁 No file available for this document.</p>
+          )}
 
           <button className="send-button" onClick={handleSend}>
             💾 Save & Send to Tenant
