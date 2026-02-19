@@ -1,30 +1,63 @@
 /* src/AdminDashboard.css */
 
 :root {
-  --primary: #1D70B7;
-  --secondary: #f1f5f9;
-  --accent: #8D7254;
-  --text-dark: #3B3B3B;
-  --text-light: #ffffff;
-  --bg-white: #ffffff;
-  --shadow: rgba(0, 0, 0, 0.08);
+  /* ✅ Match Syndicator theme */
+  --bg0: #070A12;
+  --bg1: rgba(255,255,255,0.06);
+  --bg2: rgba(255,255,255,0.10);
+  --stroke: rgba(255,255,255,0.14);
+  --stroke2: rgba(255,255,255,0.10);
+
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.68);
+  --muted2: rgba(255,255,255,0.52);
+
+  --accent: #7c3aed;   /* violet */
+  --accent2: #22d3ee;  /* cyan */
+
+  --good: #22c55e;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+
+  --r-lg: 18px;
+  --r-md: 14px;
+
+  --shadow: 0 18px 60px rgba(0,0,0,0.55);
+  --shadow2: 0 10px 30px rgba(0,0,0,0.35);
+
+  /* ✅ Back-compat aliases (so existing doc center CSS still works) */
+  --primary: var(--accent);
+  --secondary: var(--bg0);
+  --text-dark: var(--text);
+  --text-light: rgba(255,255,255,0.96);
+  --bg-white: rgba(0,0,0,0.20);
 }
 
+
 .container {
+  width: 100%;
   max-width: 800px;
-  margin: 40px auto;
+  margin: 80px auto 60px;
   padding: 24px;
-  background-color: var(--bg-white);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px var(--shadow);
-  font-family: 'Segoe UI', sans-serif;
+
+  border-radius: 18px;
+  border: 1px solid var(--card-border, rgba(255,255,255,0.15));
+
+  background: rgba(28, 51, 224, 0.06);
+
+  backdrop-filter: blur(12px);
+
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+
+  font-family: "Segoe UI", system-ui, sans-serif;
   color: var(--text-dark);
+
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
   box-sizing: border-box;
 }
+
 
 h1 {
   font-size: 2rem;

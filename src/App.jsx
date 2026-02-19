@@ -102,12 +102,22 @@ export default function App() {
 
   return (
     <div className="container">
-      <div className="header-row">
-        <h1>📄 Document Center</h1>
-        <button className="admin-link" onClick={handleAdminClick}>
-          Admin Dashboard
-        </button>
+     <div className="header-row">
+  <div className="brand">
+    <img className="brand-icon" src="/docucenter.png" alt="Document Center" />
+    <div>
+      <h1 style={{ margin: 0 }}>Document Center</h1>
+      <div className="subtle" style={{ marginTop: 4 }}>
+        📄 {documents.length} documents loaded
       </div>
+    </div>
+  </div>
+
+  <button className="admin-link" onClick={handleAdminClick} type="button">
+    Admin Dashboard
+  </button>
+</div>
+
       <p className="subtext">🧾 {documents.length} documents loaded</p>
 
       {showPasswordPrompt && (

@@ -234,3 +234,19 @@ textarea:focus {
   .container { padding: 16px 12px 40px; }
   .row { align-items: flex-start; flex-direction: column; }
 }
+
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+  border: 1px solid var(--card-border);
+}
