@@ -9,7 +9,7 @@ import fs from 'fs';
 import Document from './models/Document.js';
 import Tenant from './models/Tenant.js'; // ⬅️ add this near the top
 import Property from './models/Property.js';
-
+import Note from "./models/Note.js";
 
 dotenv.config();
 
@@ -37,7 +37,7 @@ app.use(cors({
   credentials: true
 }));
 
-
+app.options("*", cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
@@ -183,6 +183,63 @@ app.get('/api/properties', async (req, res) => {
   } catch (err) {
     console.error('❌ Failed to fetch properties:', err);
     res.status(500).json({ error: 'Failed to fetch properties', details: err.message });
+  }
+});
+// -----------------------------
+// NOTES (Admin-only, internal)
+// -----------------------------
+
+// GET: Fetch notes for a tenant
+app.get("/api/tenants/:tenantId/notes", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const notes = await Note.find({ tenantId }).sort({ createdAt: -1 });
+    res.status(200).json(notes);
+  } catch (err) {
+    console.error("❌ Failed to fetch notes:", err);
+    res.status(500).json({ error: "Failed to fetch notes", details: err.message });
+  }
+});
+
+// POST: Add a note for a tenant
+app.post("/api/tenants/:tenantId/notes", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+    const { text, propertyId, tags } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Missing note text" });
+    }
+
+    const note = new Note({
+      tenantId,
+      propertyId: propertyId || undefined,
+      text: text.trim(),
+      tags: Array.isArray(tags) ? tags : [],
+    });
+
+    await note.save();
+    res.status(201).json({ message: "✅ Note saved", note });
+  } catch (err) {
+    console.error("❌ Failed to save note:", err);
+    res.status(500).json({ error: "Failed to save note", details: err.message });
+  }
+});
+
+// DELETE: Delete a note (optional but useful)
+app.delete("/api/notes/:noteId", async (req, res) => {
+  try {
+    const { noteId } = req.params;
+    const deleted = await Note.findByIdAndDelete(noteId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Note not found" });
+    }
+
+    res.status(200).json({ message: "✅ Note deleted" });
+  } catch (err) {
+    console.error("❌ Failed to delete note:", err);
+    res.status(500).json({ error: "Failed to delete note", details: err.message });
   }
 });
 
