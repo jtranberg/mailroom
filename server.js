@@ -238,6 +238,36 @@ app.get("/api/properties", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch properties", details: err.message });
   }
 });
+// DELETE: Remove property ONLY if no ACTIVE tenants are attached
+app.delete("/api/properties/:propertyId", async (req, res) => {
+  try {
+    const { propertyId } = req.params;
+
+    const prop = await Property.findById(propertyId);
+    if (!prop) return res.status(404).json({ error: "Property not found" });
+
+    // Block deletion if any ACTIVE tenants still reference this property
+    const activeTenantCount = await Tenant.countDocuments({
+      propertyId,
+      isArchived: { $ne: true },
+    });
+
+    if (activeTenantCount > 0) {
+      return res.status(400).json({
+        error: "Cannot delete property with active tenants.",
+        code: "PROPERTY_HAS_TENANTS",
+        activeTenantCount,
+      });
+    }
+
+    await Property.findByIdAndDelete(propertyId);
+
+    res.status(200).json({ message: "✅ Property deleted" });
+  } catch (err) {
+    console.error("❌ Failed to delete property:", err);
+    res.status(500).json({ error: "Failed to delete property", details: err.message });
+  }
+});
 
 /* =========================================================
    NOTES (Admin-only, internal)

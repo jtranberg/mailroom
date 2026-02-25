@@ -254,10 +254,49 @@ export default function AdminDashboard() {
             <div className="property-list">
               <h4>📍 Properties:</h4>
               <ul>
-                {properties.map((p) => (
-                  <li key={p._id}>{p.name}</li>
-                ))}
-              </ul>
+  {properties.map((p) => {
+    const hasTenants = tenants.some(t => t.propertyId === p._id);
+
+    return (
+      <li key={p._id} className="property-row">
+        <span>{p.name}</span>
+
+        <button
+          type="button"
+          className="danger-button small"
+          disabled={hasTenants}
+          onClick={async () => {
+            if (hasTenants) return;
+
+            const ok = window.confirm(
+              `Delete property "${p.name}"?\n\nThis cannot be undone.`
+            );
+            if (!ok) return;
+
+            try {
+              const res = await fetch(`${API_BASE}/api/properties/${p._id}`, {
+                method: "DELETE",
+              });
+
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setStatus(`❌ Delete failed: ${data?.error || res.status}`);
+                return;
+              }
+
+              setProperties(prev => prev.filter(x => x._id !== p._id));
+              setStatus(`✅ Property "${p.name}" deleted`);
+            } catch (err) {
+              setStatus(`❌ Error: ${err.message}`);
+            }
+          }}
+        >
+          🗑 Remove
+        </button>
+      </li>
+    );
+  })}
+</ul>
             </div>
           )}
         </section>
@@ -341,7 +380,7 @@ export default function AdminDashboard() {
           </div>
         </form>
 
-        {tenants.length > 0 && (
+        {/* {tenants.length > 0 && (
           <div className="tenant-list">
             <h4>🧑‍💼 Tenants:</h4>
             <ul>
@@ -352,7 +391,7 @@ export default function AdminDashboard() {
               ))}
             </ul>
           </div>
-        )}
+        )} */}
 
         {status && <p className="status">{status}</p>}
       </div>
