@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminDashboard.css";
 
@@ -12,15 +12,22 @@ export default function AdminDashboard() {
   const [properties, setProperties] = useState([]);
   const [newProperty, setNewProperty] = useState("");
 
+  const [selectedTenantId, setSelectedTenantId] = useState("");
+
   const [tenantForm, setTenantForm] = useState({
     name: "",
     email: "",
     unit: "",
-    property: "",
+    property: "", // this will now store propertyId (_id)
   });
 
   const navigate = useNavigate();
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  // Map for quick lookup: propertyId -> property object
+  const propertyById = useMemo(() => {
+    return Object.fromEntries(properties.map((p) => [p._id, p]));
+  }, [properties]);
 
   useEffect(() => {
     const fetchTenants = async () => {
@@ -87,9 +94,9 @@ export default function AdminDashboard() {
     const name = tenantForm.name.trim();
     const email = tenantForm.email.trim().toLowerCase();
     const unit = tenantForm.unit.trim();
-    const property = tenantForm.property;
+    const propertyId = tenantForm.property; // now a real property _id
 
-    if (!name || !email || !unit || !property) {
+    if (!name || !email || !unit || !propertyId) {
       setStatus("❌ Please fill out all tenant fields");
       return;
     }
@@ -111,7 +118,7 @@ export default function AdminDashboard() {
           name,
           email,
           unit,
-          propertyId: property,
+          propertyId, // ✅ correct
         }),
       });
 
@@ -124,6 +131,7 @@ export default function AdminDashboard() {
 
       setStatus(`✅ Tenant ${data.tenant.name} added.`);
       setTenantForm({ name: "", email: "", unit: "", property: "" });
+      setSelectedTenantId("");
 
       setTenants((prev) => [...prev, data.tenant]);
     } catch (err) {
@@ -131,25 +139,23 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ Archive/Delete tenant by EMAIL typed in the form (button beside Add)
-  const handleArchiveByEmail = async () => {
-    const email = tenantForm.email.trim().toLowerCase();
-    if (!email) {
-      setStatus("❌ Enter the tenant email to archive.");
+  // ✅ Archive tenant by SELECTED tenant (no typing email needed)
+  const handleArchiveSelected = async () => {
+    if (!selectedTenantId) {
+      setStatus("❌ Select a tenant first.");
       return;
     }
 
-    const target = tenants.find(
-      (t) => String(t.email || "").trim().toLowerCase() === email
-    );
-
+    const target = tenants.find((t) => t._id === selectedTenantId);
     if (!target) {
-      setStatus("⚠️ No tenant found with that email.");
+      setStatus("⚠️ Selected tenant not found.");
       return;
     }
+
+    const propName = propertyById[target.propertyId]?.name || "Unknown";
 
     const ok = window.confirm(
-      `Archive tenant?\n\n${target.name} (${target.email})\nUnit ${target.unit}\nProperty: ${target.propertyId}\n\nNotes + emails will be kept.`
+      `Archive tenant?\n\n${target.name} (${target.email})\nUnit ${target.unit}\nProperty: ${propName}\n\nNotes + emails will be kept.`
     );
     if (!ok) return;
 
@@ -167,7 +173,9 @@ export default function AdminDashboard() {
 
       setStatus(`✅ Archived tenant: ${target.name}`);
       setTenants((prev) => prev.filter((t) => t._id !== target._id));
-      setTenantForm((p) => ({ ...p, email: "" })); // optional: clear email field
+
+      setSelectedTenantId("");
+      setTenantForm({ name: "", email: "", unit: "", property: "" });
     } catch (err) {
       setStatus(`❌ Archive failed: ${err.message}`);
     }
@@ -257,6 +265,40 @@ export default function AdminDashboard() {
         <form onSubmit={handleTenantSubmit} className="tenant-form">
           <h3>Add / Archive Tenant</h3>
 
+          {/* ✅ Select existing tenant */}
+          <select
+          
+            value={selectedTenantId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedTenantId(id);
+
+              if (!id) {
+                setTenantForm({ name: "", email: "", unit: "", property: "" });
+                return;
+              }
+
+              const t = tenants.find((x) => x._id === id);
+              if (!t) return;
+
+              setTenantForm({
+                name: t.name || "",
+                email: t.email || "",
+                unit: t.unit || "",
+                property: t.propertyId || "", // expects tenant.propertyId is property _id
+              });
+
+              setStatus(`✅ Selected tenant: ${t.name}`);
+            }}
+          >
+            <option value="disabled">Select Existing Tenant</option>
+            {tenants.map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.name} — Unit {t.unit} ({t.email})
+              </option>
+            ))}
+          </select>
+
           <input
             type="text"
             placeholder="Name"
@@ -266,7 +308,7 @@ export default function AdminDashboard() {
 
           <input
             type="email"
-            placeholder="Email (used for archive too)"
+            placeholder="Email"
             value={tenantForm.email}
             onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
           />
@@ -278,23 +320,23 @@ export default function AdminDashboard() {
             onChange={(e) => setTenantForm({ ...tenantForm, unit: e.target.value })}
           />
 
+          {/* ✅ Property select uses property _id */}
           <select
             value={tenantForm.property}
             onChange={(e) => setTenantForm({ ...tenantForm, property: e.target.value })}
           >
             <option value="">Select Property</option>
             {properties.map((p) => (
-              <option key={p._id} value={p.name}>
+              <option key={p._id} value={p._id}>
                 {p.name}
               </option>
             ))}
           </select>
 
-          {/* ✅ Buttons beside each other */}
           <div className="tenant-actions">
             <button type="submit">➕ Add Tenant</button>
-            <button type="button" className="danger-button" onClick={handleArchiveByEmail}>
-              🗑 Archive
+            <button type="button" className="danger-button" onClick={handleArchiveSelected}>
+              🗑 Archive Selected
             </button>
           </div>
         </form>
@@ -305,7 +347,7 @@ export default function AdminDashboard() {
             <ul>
               {tenants.map((t) => (
                 <li key={t._id}>
-                  {t.name} ({t.unit}) — {t.propertyId}
+                  {t.name} ({t.unit}) — {propertyById[t.propertyId]?.name || t.propertyId}
                 </li>
               ))}
             </ul>
