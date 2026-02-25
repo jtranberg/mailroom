@@ -22,7 +22,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/documents`);
       const data = await res.json();
-      setDocuments(data);
+      setDocuments(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("❌ Failed to fetch documents:", err);
     }
@@ -30,28 +30,34 @@ export default function App() {
 
   const fetchPropertiesAndTenants = async () => {
     try {
-      // 1) fetch properties (id -> name)
+      // 1) fetch all properties (source of truth)
       const pres = await fetch(`${API_BASE}/api/properties`);
       const plist = await pres.json();
+      const propertiesList = Array.isArray(plist) ? plist : [];
 
-      const propertyNameById = {};
-      (Array.isArray(plist) ? plist : []).forEach((p) => {
-        propertyNameById[p._id] = p.name;
+      // 2) seed grouped object from PROPERTIES so even empty ones appear
+      const grouped = {};
+      propertiesList.forEach((p) => {
+        grouped[p._id] = {
+          id: p._id,
+          name: p.name,
+          tenants: [],
+        };
       });
 
-      // 2) fetch tenants
+      // 3) fetch tenants and attach into grouped
       const tres = await fetch(`${API_BASE}/api/tenants`);
       const tenantList = await tres.json();
+      const tenants = Array.isArray(tenantList) ? tenantList : [];
 
-      // 3) group tenants by propertyId, but label with REAL property name
-      const grouped = {};
-      (Array.isArray(tenantList) ? tenantList : []).forEach((tenant) => {
+      tenants.forEach((tenant) => {
         const key = tenant.propertyId;
 
+        // if tenant references a propertyId that isn't in /properties, create a fallback bucket
         if (!grouped[key]) {
           grouped[key] = {
             id: key,
-            name: propertyNameById[key] || "Unknown Property",
+            name: "Unknown Property",
             tenants: [],
           };
         }
@@ -64,7 +70,22 @@ export default function App() {
         });
       });
 
-      setProperties(Object.values(grouped));
+      // optional: sort properties A-Z
+      const finalProps = Object.values(grouped).sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""))
+      );
+
+      // optional: sort tenants by unit then name
+      finalProps.forEach((p) => {
+        p.tenants.sort((a, b) => {
+          const ua = String(a.unit || "");
+          const ub = String(b.unit || "");
+          if (ua !== ub) return ua.localeCompare(ub, undefined, { numeric: true });
+          return String(a.name || "").localeCompare(String(b.name || ""));
+        });
+      });
+
+      setProperties(finalProps);
     } catch (err) {
       console.error("❌ Failed to fetch properties/tenants:", err);
     }
@@ -163,18 +184,17 @@ export default function App() {
         ))}
       </div>
 
-      {selectedProperty && (
-        <>
-          <h2>2. Choose Tenant</h2>
-          <div className="button-group">
-            {selectedProperty.tenants.map((tenant) => (
-              <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
-                {tenant.name} – Unit {tenant.unit}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+     {selectedProperty.tenants.length === 0 ? (
+  <p className="subtle">No tenants yet for this property.</p>
+) : (
+  <div className="button-group">
+    {selectedProperty.tenants.map((tenant) => (
+      <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
+        {tenant.name} – Unit {tenant.unit}
+      </button>
+    ))}
+  </div>
+)}
 
       {selectedTenant && (
         <>
