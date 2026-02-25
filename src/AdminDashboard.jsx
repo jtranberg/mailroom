@@ -24,6 +24,40 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+
+  const handleRepairPropertyLinks = async () => {
+  setStatus("🛠 Repairing tenant property links...");
+
+  try {
+    const res = await fetch(`${API_BASE}/api/repair/tenant-property-ids`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-key": "wallsecure", // same as ADMIN_SECRET for now
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setStatus(`❌ Repair failed: ${data?.error || `Server error (${res.status})`}`);
+      return;
+    }
+
+    const c = data?.counts || {};
+    setStatus(
+      `✅ Repair complete — Updated: ${c.updated || 0}, Skipped: ${c.skipped || 0}, Unresolved: ${c.unresolved || 0}`
+    );
+
+    // Refresh lists so UI immediately reflects the fixes
+    // easiest: re-fetch tenants/properties using your existing fetch calls
+    // (if you have fetchTenants/fetchProperties inside useEffect only, quick refresh is:)
+    window.location.reload();
+  } catch (err) {
+    setStatus(`❌ Repair failed: ${err.message}`);
+  }
+};
+
   // Map for quick lookup: propertyId -> property object
   const propertyById = useMemo(() => {
     return Object.fromEntries(properties.map((p) => [p._id, p]));
@@ -256,6 +290,9 @@ export default function AdminDashboard() {
               <ul>
   {properties.map((p) => {
     const hasTenants = tenants.some(t => t.propertyId === p._id);
+    <button type="button" onClick={handleRepairPropertyLinks}>
+  🛠 Repair Property Links
+</button>
 
     return (
       <li key={p._id} className="property-row">

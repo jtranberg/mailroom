@@ -64,19 +64,19 @@ app.get("/", (req, res) => {
 });
 
 // Seed database with sample documents
-app.get("/api/seed", async (req, res) => {
-  try {
-    await Document.deleteMany();
-    const inserted = await Document.insertMany([
-      { type: "lease", label: "Lease Agreement" },
-      { type: "maintenance", label: "Maintenance Request" },
-      { type: "inspection", label: "Inspection Form" },
-    ]);
-    res.status(201).json({ message: "✅ Seeded documents", inserted });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to seed documents", details: err.message });
-  }
-});
+// app.get("/api/seed", async (req, res) => {
+//   try {
+//     await Document.deleteMany();
+//     const inserted = await Document.insertMany([
+//       { type: "lease", label: "Lease Agreement" },
+//       { type: "maintenance", label: "Maintenance Request" },
+//       { type: "inspection", label: "Inspection Form" },
+//     ]);
+//     res.status(201).json({ message: "✅ Seeded documents", inserted });
+//   } catch (err) {
+//     res.status(500).json({ error: "Failed to seed documents", details: err.message });
+//   }
+// });
 
 // GET: Fetch all documents
 app.get("/api/documents", async (req, res) => {
@@ -211,6 +211,89 @@ app.delete("/api/tenants/:tenantId", async (req, res) => {
 /* =========================================================
    PROPERTIES
 ========================================================= */
+/* =========================================================
+   REPAIR: TENANT propertyId (name -> ObjectId)
+   Admin-only (simple key)
+   POST /api/repair/tenant-property-ids
+========================================================= */
+
+app.post("/api/repair/tenant-property-ids", async (req, res) => {
+  try {
+    const adminKey = String(req.headers["x-admin-key"] || "");
+    const expectedKey = process.env.ADMIN_KEY || "wallsecure"; // keep same as your UI secret for now
+
+    if (adminKey !== expectedKey) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Load properties once
+    const properties = await Property.find();
+    const propertyById = new Map(properties.map((p) => [String(p._id), p]));
+    const propertyIdByName = new Map(
+      properties.map((p) => [String(p.name || "").trim().toLowerCase(), String(p._id)])
+    );
+
+    // Fetch tenants (include archived too, so everything gets repaired)
+    const tenants = await Tenant.find({});
+
+    const updated = [];
+    const unresolved = [];
+    const skipped = [];
+
+    for (const t of tenants) {
+      const raw = String(t.propertyId || "").trim();
+      if (!raw) {
+        skipped.push({ tenantId: String(t._id), reason: "empty propertyId" });
+        continue;
+      }
+
+      // Case A: already points to a real property _id
+      if (propertyById.has(raw)) {
+        skipped.push({ tenantId: String(t._id), reason: "already valid propertyId" });
+        continue;
+      }
+
+      // Case B: propertyId is actually a property NAME (old data)
+      const mappedId = propertyIdByName.get(raw.toLowerCase());
+      if (mappedId && propertyById.has(mappedId)) {
+        t.propertyId = mappedId;
+        await t.save();
+
+        updated.push({
+          tenantId: String(t._id),
+          tenantEmail: t.email,
+          from: raw,
+          to: mappedId,
+          propertyName: propertyById.get(mappedId)?.name || null,
+        });
+        continue;
+      }
+
+      // Case C: orphan / no match
+      unresolved.push({
+        tenantId: String(t._id),
+        tenantEmail: t.email,
+        propertyId: raw,
+      });
+    }
+
+    return res.status(200).json({
+      message: "✅ Repair complete",
+      counts: {
+        totalTenants: tenants.length,
+        updated: updated.length,
+        skipped: skipped.length,
+        unresolved: unresolved.length,
+      },
+      updated,
+      unresolved,
+      skipped,
+    });
+  } catch (err) {
+    console.error("❌ Repair failed:", err);
+    return res.status(500).json({ error: "Repair failed", details: err.message });
+  }
+});
 
 // POST: Add new property
 app.post("/api/properties", async (req, res) => {
