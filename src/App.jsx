@@ -29,67 +29,92 @@ export default function App() {
   };
 
   const fetchPropertiesAndTenants = async () => {
-    try {
-      // 1) fetch all properties (source of truth)
-      const pres = await fetch(`${API_BASE}/api/properties`);
-      const plist = await pres.json();
-      const propertiesList = Array.isArray(plist) ? plist : [];
+  try {
+    const pres = await fetch(`${API_BASE}/api/properties`);
+    const plist = await pres.json();
+    const propertiesList = Array.isArray(plist) ? plist : [];
 
-      // 2) seed grouped object from PROPERTIES so even empty ones appear
-      const grouped = {};
-      propertiesList.forEach((p) => {
-        grouped[p._id] = {
-          id: p._id,
-          name: p.name,
-          tenants: [],
-        };
-      });
+    const grouped = {};
+    const propertyById = {};
+    const propertyIdByName = {};
 
-      // 3) fetch tenants and attach into grouped
-      const tres = await fetch(`${API_BASE}/api/tenants`);
-      const tenantList = await tres.json();
-      const tenants = Array.isArray(tenantList) ? tenantList : [];
+    const norm = (s) => String(s || "").trim().toLowerCase();
 
-      tenants.forEach((tenant) => {
-        const key = tenant.propertyId;
+    propertiesList.forEach((p) => {
+      propertyById[p._id] = p;
+      propertyIdByName[norm(p.name)] = p._id;
 
-        // if tenant references a propertyId that isn't in /properties, create a fallback bucket
-        if (!grouped[key]) {
-          grouped[key] = {
-            id: key,
-            name: "Unknown Property",
-            tenants: [],
-          };
-        }
+      grouped[p._id] = {
+        id: p._id,
+        name: p.name,
+        tenants: [],
+      };
+    });
 
-        grouped[key].tenants.push({
+    const tres = await fetch(`${API_BASE}/api/tenants`);
+    const tenantList = await tres.json();
+    const tenants = Array.isArray(tenantList) ? tenantList : [];
+
+    const orphanTenants = [];
+
+    tenants.forEach((tenant) => {
+      const rawKey = tenant.propertyId;
+
+      // Case A: already a real property _id
+      if (grouped[rawKey]) {
+        grouped[rawKey].tenants.push({
           id: tenant._id,
           name: tenant.name,
           email: tenant.email,
           unit: tenant.unit,
         });
-      });
+        return;
+      }
 
-      // optional: sort properties A-Z
-      const finalProps = Object.values(grouped).sort((a, b) =>
-        String(a.name || "").localeCompare(String(b.name || ""))
-      );
-
-      // optional: sort tenants by unit then name
-      finalProps.forEach((p) => {
-        p.tenants.sort((a, b) => {
-          const ua = String(a.unit || "");
-          const ub = String(b.unit || "");
-          if (ua !== ub) return ua.localeCompare(ub, undefined, { numeric: true });
-          return String(a.name || "").localeCompare(String(b.name || ""));
+      // Case B: propertyId is actually a property NAME (old data)
+      const byNameId = propertyIdByName[norm(rawKey)];
+      if (byNameId && grouped[byNameId]) {
+        grouped[byNameId].tenants.push({
+          id: tenant._id,
+          name: tenant.name,
+          email: tenant.email,
+          unit: tenant.unit,
         });
-      });
+        return;
+      }
 
-      setProperties(finalProps);
-    } catch (err) {
-      console.error("❌ Failed to fetch properties/tenants:", err);
+      // Case C: orphaned (property deleted / id mismatch)
+      orphanTenants.push(tenant);
+    });
+
+    // Sort props A-Z
+    const finalProps = Object.values(grouped).sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""))
+    );
+
+    // Sort tenants by unit then name
+    finalProps.forEach((p) => {
+      p.tenants.sort((a, b) => {
+        const ua = String(a.unit || "");
+        const ub = String(b.unit || "");
+        if (ua !== ub) return ua.localeCompare(ub, undefined, { numeric: true });
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+    });
+
+    setProperties(finalProps);
+
+    // Optional: surface a warning so you know you have data to repair
+    if (orphanTenants.length > 0) {
+      console.warn("⚠️ Orphan tenants (propertyId mismatch):", orphanTenants);
+      setStatus(
+        `⚠️ ${orphanTenants.length} tenant(s) have an unknown property link. Fix propertyId values in Admin.`
+      );
     }
-  };
+  } catch (err) {
+    console.error("❌ Failed to fetch properties/tenants:", err);
+  }
+};
 
   fetchDocuments();
   fetchPropertiesAndTenants();
