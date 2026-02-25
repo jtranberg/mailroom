@@ -251,11 +251,9 @@ textarea:focus {
   gap: 12px;
 }
 
-.brand-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  object-fit: cover;
-  box-shadow: 0 12px 30px rgba(20, 16, 10, 0.12);
-  border: 1px solid var(--stroke2);
+.brand-icon,
+.mailroom-logo {
+  width: 52px;   /* or 44px */
+  height: 52px;
+  object-fit: contain;
 }

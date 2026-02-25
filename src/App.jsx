@@ -167,13 +167,13 @@ export default function App() {
     <div className="container">
      <div className="header-row">
   <div className="brand">
-    <img className="brand-icon" src="/docucenter.png" alt="Document Center" />
-    <div>
-      <h1 style={{ margin: 0 }}>Document Center</h1>
-      <div className="subtle" style={{ marginTop: 4 }}>
-        📄 {documents.length} documents loaded
-      </div>
+     <img className="brand-icon" src="/wall.svg" alt="Wall" />
+  <div>
+    <h1 style={{ margin: 0 }}>Document Center</h1>
+    <div className="subtle" style={{ marginTop: 4 }}>
+      📄 {documents.length} documents loaded
     </div>
+  </div>
   </div>
 
   <button className="admin-link" onClick={handleAdminClick} type="button">
