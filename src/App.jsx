@@ -18,44 +18,61 @@ export default function App() {
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/documents`);
-        const data = await res.json();
-        setDocuments(data);
-      } catch (err) {
-        console.error("❌ Failed to fetch documents:", err);
-      }
-    };
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/documents`);
+      const data = await res.json();
+      setDocuments(data);
+    } catch (err) {
+      console.error("❌ Failed to fetch documents:", err);
+    }
+  };
 
-    const fetchTenants = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/tenants`);
-        const tenantList = await res.json();
+  const fetchPropertiesAndTenants = async () => {
+    try {
+      // 1) fetch properties (id -> name)
+      const pres = await fetch(`${API_BASE}/api/properties`);
+      const plist = await pres.json();
 
-        const grouped = {};
-        tenantList.forEach((tenant) => {
-          const key = tenant.propertyId;
-          if (!grouped[key]) {
-            grouped[key] = { id: key, name: key, tenants: [] };
-          }
-          grouped[key].tenants.push({
-            id: tenant._id,
-            name: tenant.name,
-            email: tenant.email,
-            unit: tenant.unit,
-          });
+      const propertyNameById = {};
+      (Array.isArray(plist) ? plist : []).forEach((p) => {
+        propertyNameById[p._id] = p.name;
+      });
+
+      // 2) fetch tenants
+      const tres = await fetch(`${API_BASE}/api/tenants`);
+      const tenantList = await tres.json();
+
+      // 3) group tenants by propertyId, but label with REAL property name
+      const grouped = {};
+      (Array.isArray(tenantList) ? tenantList : []).forEach((tenant) => {
+        const key = tenant.propertyId;
+
+        if (!grouped[key]) {
+          grouped[key] = {
+            id: key,
+            name: propertyNameById[key] || "Unknown Property",
+            tenants: [],
+          };
+        }
+
+        grouped[key].tenants.push({
+          id: tenant._id,
+          name: tenant.name,
+          email: tenant.email,
+          unit: tenant.unit,
         });
+      });
 
-        setProperties(Object.values(grouped));
-      } catch (err) {
-        console.error("❌ Failed to fetch tenants:", err);
-      }
-    };
+      setProperties(Object.values(grouped));
+    } catch (err) {
+      console.error("❌ Failed to fetch properties/tenants:", err);
+    }
+  };
 
-    fetchDocuments();
-    fetchTenants();
-  }, [API_BASE]);
+  fetchDocuments();
+  fetchPropertiesAndTenants();
+}, [API_BASE]);
 
   const handlePropertySelect = (property) => {
     setSelectedProperty(property);
