@@ -128,23 +128,40 @@ app.post('/api/documents', upload.single('file'), async (req, res) => {
     res.status(500).json({ error: 'Failed to upload document', details: err.message });
   }
 });
-// POST: Add new tenant
-app.post('/api/tenants', async (req, res) => {
-   console.log('📥 POST /api/tenants called with:', req.body);
+
+app.delete("/api/tenants/:tenantId", async (req, res) => {
   try {
-    const { name, email, unit, propertyId } = req.body;
+    const { tenantId } = req.params;
+    const { reason } = req.body || {};
 
-    if (!name || !email || !unit || !propertyId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+    const t = await Tenant.findById(tenantId);
+    if (!t) return res.status(404).json({ error: "Tenant not found" });
 
-    const newTenant = new Tenant({ name, email, unit, propertyId });
-    await newTenant.save();
+    // ✅ soft delete (archive)
+    t.isArchived = true;
+    t.archivedAt = new Date();
+    t.archivedReason = reason ? String(reason).trim() : "Archived";
 
-    res.status(201).json({ message: '✅ Tenant added', tenant: newTenant });
+    await t.save();
+
+    res.status(200).json({ message: "✅ Tenant archived", tenant: t });
   } catch (err) {
-    console.error('❌ Failed to add tenant:', err);
-    res.status(500).json({ error: 'Failed to add tenant', details: err.message });
+    console.error("❌ Failed to archive tenant:", err);
+    res.status(500).json({ error: "Failed to archive tenant", details: err.message });
+  }
+});
+// POST: Add new tenant
+app.get("/api/tenants", async (req, res) => {
+  try {
+    const includeArchived = String(req.query.includeArchived || "") === "true";
+
+    const filter = includeArchived ? {} : { isArchived: { $ne: true } };
+
+    const tenants = await Tenant.find(filter).sort({ createdAt: -1 });
+    res.status(200).json(tenants);
+  } catch (err) {
+    console.error("❌ Failed to fetch tenants:", err);
+    res.status(500).json({ error: "Failed to fetch tenants", details: err.message });
   }
 });
 
@@ -198,6 +215,54 @@ app.get("/api/tenants/:tenantId/notes", async (req, res) => {
   } catch (err) {
     console.error("❌ Failed to fetch notes:", err);
     res.status(500).json({ error: "Failed to fetch notes", details: err.message });
+  }
+});
+
+app.post("/api/tenants", async (req, res) => {
+  console.log("📥 POST /api/tenants called with:", req.body);
+
+  try {
+    let { name, email, unit, propertyId } = req.body;
+
+    if (!name || !email || !unit || !propertyId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    email = String(email).trim().toLowerCase();
+
+    // ✅ if email exists (active or archived), block and warn
+    const existing = await Tenant.findOne({ email });
+
+    if (existing) {
+      // if archived, show “alert / notes exist”
+      if (existing.isArchived) {
+        const noteCount = await Note.countDocuments({ tenantId: existing._id });
+
+        return res.status(409).json({
+          error: "This email belongs to a previous tenant. Review notes before re-adding.",
+          code: "PREVIOUS_TENANT",
+          tenantId: existing._id,
+          archivedAt: existing.archivedAt,
+          archivedReason: existing.archivedReason || null,
+          noteCount,
+        });
+      }
+
+      // active duplicate
+      return res.status(409).json({
+        error: "Tenant email already exists.",
+        code: "DUPLICATE_EMAIL",
+        tenantId: existing._id,
+      });
+    }
+
+    const newTenant = new Tenant({ name, email, unit, propertyId, isArchived: false });
+    await newTenant.save();
+
+    res.status(201).json({ message: "✅ Tenant added", tenant: newTenant });
+  } catch (err) {
+    console.error("❌ Failed to add tenant:", err);
+    res.status(500).json({ error: "Failed to add tenant", details: err.message });
   }
 });
 

@@ -1,10 +1,21 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const TenantSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true },
-  unit: { type: String, required: true },
-  propertyId: { type: String, required: true }, // match 'prop1', 'prop2', etc.
-});
+const TenantSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true, lowercase: true },
+    unit: { type: String, required: true, trim: true },
+    propertyId: { type: String, required: true, trim: true },
 
-export default mongoose.model('Tenant', TenantSchema);
+    // ✅ soft delete / archive
+    isArchived: { type: Boolean, default: false, index: true },
+    archivedAt: { type: Date },
+    archivedReason: { type: String, trim: true },
+  },
+  { timestamps: true }
+);
+
+// optional index (don’t make it unique yet unless you’re sure all emails should be unique globally)
+// TenantSchema.index({ email: 1 });
+
+export default mongoose.model("Tenant", TenantSchema);
