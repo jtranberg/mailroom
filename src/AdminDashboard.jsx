@@ -1,31 +1,33 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import './AdminDashboard.css';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import "./AdminDashboard.css";
 
 export default function AdminDashboard() {
-  const [type, setType] = useState('');
-  const [label, setLabel] = useState('');
+  const [type, setType] = useState("");
+  const [label, setLabel] = useState("");
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState("");
+
   const [tenants, setTenants] = useState([]);
   const [properties, setProperties] = useState([]);
-  const [newProperty, setNewProperty] = useState('');
+  const [newProperty, setNewProperty] = useState("");
+
   const [tenantForm, setTenantForm] = useState({
-    name: '',
-    email: '',
-    unit: '',
-    property: ''
+    name: "",
+    email: "",
+    unit: "",
+    property: "",
   });
 
   const navigate = useNavigate();
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(() => {
     const fetchTenants = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/tenants`);
         const data = await res.json();
-        if (res.ok) setTenants(data);
+        if (res.ok) setTenants(Array.isArray(data) ? data : []);
       } catch (err) {
         setStatus(`❌ Failed to load tenants: ${err.message}`);
       }
@@ -35,7 +37,7 @@ export default function AdminDashboard() {
       try {
         const res = await fetch(`${API_BASE}/api/properties`);
         const data = await res.json();
-        if (res.ok) setProperties(data);
+        if (res.ok) setProperties(Array.isArray(data) ? data : []);
       } catch (err) {
         setStatus(`❌ Failed to load properties: ${err.message}`);
       }
@@ -49,29 +51,30 @@ export default function AdminDashboard() {
     e.preventDefault();
 
     if (!type || !label || !file) {
-      setStatus('❌ Please fill out all fields');
+      setStatus("❌ Please fill out all fields");
       return;
     }
 
     const formData = new FormData();
-    formData.append('type', type);
-    formData.append('label', label);
-    formData.append('file', file);
+    formData.append("type", type);
+    formData.append("label", label);
+    formData.append("file", file);
 
     try {
       const res = await fetch(`${API_BASE}/api/documents`, {
-        method: 'POST',
-        body: formData
+        method: "POST",
+        body: formData,
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        setStatus(`✅ Uploaded: ${data.document.label}`);
-        setType('');
-        setLabel('');
+        setStatus(`✅ Uploaded: ${data?.document?.label || "Document"}`);
+        setType("");
+        setLabel("");
         setFile(null);
       } else {
-        setStatus(`❌ Upload failed: ${data.error}`);
+        setStatus(`❌ Upload failed: ${data?.error || "Unknown error"}`);
       }
     } catch (err) {
       setStatus(`❌ Error: ${err.message}`);
@@ -80,58 +83,115 @@ export default function AdminDashboard() {
 
   const handleTenantSubmit = async (e) => {
     e.preventDefault();
-    const { name, email, unit, property } = tenantForm;
+
+    const name = tenantForm.name.trim();
+    const email = tenantForm.email.trim().toLowerCase();
+    const unit = tenantForm.unit.trim();
+    const property = tenantForm.property;
 
     if (!name || !email || !unit || !property) {
-      setStatus('❌ Please fill out all tenant fields');
+      setStatus("❌ Please fill out all tenant fields");
+      return;
+    }
+
+    // ✅ duplicate guard (by email across ALL tenants)
+    const exists = tenants.some(
+      (t) => String(t.email || "").trim().toLowerCase() === email
+    );
+    if (exists) {
+      setStatus("⚠️ A tenant with this email already exists.");
       return;
     }
 
     try {
       const res = await fetch(`${API_BASE}/api/tenants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           email,
           unit,
-          propertyId: property
-        })
+          propertyId: property,
+        }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (res.ok) {
-        setStatus(`✅ Tenant ${data.tenant.name} added.`);
-        setTenantForm({ name: '', email: '', unit: '', property: '' });
-        setTenants((prev) => [...prev, data.tenant]);
-      } else {
-        setStatus(`❌ Add failed: ${data.error}`);
+      if (!res.ok) {
+        setStatus(`❌ Add failed: ${data?.error || `Server error (${res.status})`}`);
+        return;
       }
+
+      setStatus(`✅ Tenant ${data.tenant.name} added.`);
+      setTenantForm({ name: "", email: "", unit: "", property: "" });
+
+      setTenants((prev) => [...prev, data.tenant]);
     } catch (err) {
       setStatus(`❌ Error: ${err.message}`);
     }
   };
 
+  // ✅ Archive/Delete tenant by EMAIL typed in the form (button beside Add)
+  const handleArchiveByEmail = async () => {
+    const email = tenantForm.email.trim().toLowerCase();
+    if (!email) {
+      setStatus("❌ Enter the tenant email to archive.");
+      return;
+    }
+
+    const target = tenants.find(
+      (t) => String(t.email || "").trim().toLowerCase() === email
+    );
+
+    if (!target) {
+      setStatus("⚠️ No tenant found with that email.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Archive tenant?\n\n${target.name} (${target.email})\nUnit ${target.unit}\nProperty: ${target.propertyId}\n\nNotes + emails will be kept.`
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/tenants/${target._id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setStatus(`❌ Archive failed: ${data?.error || `Server error (${res.status})`}`);
+        return;
+      }
+
+      setStatus(`✅ Archived tenant: ${target.name}`);
+      setTenants((prev) => prev.filter((t) => t._id !== target._id));
+      setTenantForm((p) => ({ ...p, email: "" })); // optional: clear email field
+    } catch (err) {
+      setStatus(`❌ Archive failed: ${err.message}`);
+    }
+  };
+
   const handleAddProperty = async (e) => {
     e.preventDefault();
-    if (!newProperty.trim()) return setStatus('❌ Property name is required');
+    if (!newProperty.trim()) return setStatus("❌ Property name is required");
 
     try {
       const res = await fetch(`${API_BASE}/api/properties`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newProperty.trim() })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newProperty.trim() }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         setStatus(`✅ Property "${data.property.name}" added`);
         setProperties((prev) => [...prev, data.property]);
-        setNewProperty('');
+        setNewProperty("");
       } else {
-        setStatus(`❌ Add failed: ${data.error}`);
+        setStatus(`❌ Add failed: ${data?.error || "Unknown error"}`);
       }
     } catch (err) {
       setStatus(`❌ Error: ${err.message}`);
@@ -139,116 +199,121 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="container">
-      <div className="admin-header">
-        <h2>🛠️ Admin Dashboard</h2>
-        <button className="back-button" onClick={() => navigate('/')}>
-          ⬅ Back to App
-        </button>
-      </div>
+    <div className="admin-page">
+      <div className="container">
+        <div className="admin-header">
+          <h2>🛠️ Admin Dashboard</h2>
+          <button className="back-button" onClick={() => navigate("/")}>
+            ⬅ Back to App
+          </button>
+        </div>
 
-      <form onSubmit={handleUpload}>
-        <h3>Upload PDF Document</h3>
-        <input
-          type="text"
-          placeholder="Document Type"
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Label"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-        />
-        <input
-          type="file"
-          accept="application/pdf"
-          onChange={(e) => setFile(e.target.files[0])}
-        />
-        <button type="submit">📤 Upload Document</button>
-      </form>
-
-      <section className="property-section">
-        <h3>🏢 Manage Properties</h3>
-        <form onSubmit={handleAddProperty}>
+        <form onSubmit={handleUpload}>
+          <h3>Upload PDF Document</h3>
           <input
             type="text"
-            placeholder="New Property Name"
-            value={newProperty}
-            onChange={(e) => setNewProperty(e.target.value)}
+            placeholder="Document Type"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
           />
-          <button type="submit">➕ Add Property</button>
+          <input
+            type="text"
+            placeholder="Label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
+          <button type="submit">📤 Upload Document</button>
         </form>
 
-        {properties.length > 0 && (
-          <div className="property-list">
-            <h4>📍 Properties:</h4>
+        <section className="property-section">
+          <h3>🏢 Manage Properties</h3>
+          <form onSubmit={handleAddProperty}>
+            <input
+              type="text"
+              placeholder="New Property Name"
+              value={newProperty}
+              onChange={(e) => setNewProperty(e.target.value)}
+            />
+            <button type="submit">➕ Add Property</button>
+          </form>
+
+          {properties.length > 0 && (
+            <div className="property-list">
+              <h4>📍 Properties:</h4>
+              <ul>
+                {properties.map((p) => (
+                  <li key={p._id}>{p.name}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
+        <form onSubmit={handleTenantSubmit} className="tenant-form">
+          <h3>Add / Archive Tenant</h3>
+
+          <input
+            type="text"
+            placeholder="Name"
+            value={tenantForm.name}
+            onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
+          />
+
+          <input
+            type="email"
+            placeholder="Email (used for archive too)"
+            value={tenantForm.email}
+            onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
+          />
+
+          <input
+            type="text"
+            placeholder="Unit #"
+            value={tenantForm.unit}
+            onChange={(e) => setTenantForm({ ...tenantForm, unit: e.target.value })}
+          />
+
+          <select
+            value={tenantForm.property}
+            onChange={(e) => setTenantForm({ ...tenantForm, property: e.target.value })}
+          >
+            <option value="">Select Property</option>
+            {properties.map((p) => (
+              <option key={p._id} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
+          {/* ✅ Buttons beside each other */}
+          <div className="tenant-actions">
+            <button type="submit">➕ Add Tenant</button>
+            <button type="button" className="danger-button" onClick={handleArchiveByEmail}>
+              🗑 Archive
+            </button>
+          </div>
+        </form>
+
+        {tenants.length > 0 && (
+          <div className="tenant-list">
+            <h4>🧑‍💼 Tenants:</h4>
             <ul>
-              {properties.map((p) => (
-                <li key={p._id}>{p.name}</li>
+              {tenants.map((t) => (
+                <li key={t._id}>
+                  {t.name} ({t.unit}) — {t.propertyId}
+                </li>
               ))}
             </ul>
           </div>
         )}
-      </section>
 
-      <form onSubmit={handleTenantSubmit} className="tenant-form">
-        <h3>Add New Tenant</h3>
-        <input
-          type="text"
-          placeholder="Name"
-          value={tenantForm.name}
-          onChange={(e) =>
-            setTenantForm({ ...tenantForm, name: e.target.value })
-          }
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={tenantForm.email}
-          onChange={(e) =>
-            setTenantForm({ ...tenantForm, email: e.target.value })
-          }
-        />
-        <input
-          type="text"
-          placeholder="Unit #"
-          value={tenantForm.unit}
-          onChange={(e) =>
-            setTenantForm({ ...tenantForm, unit: e.target.value })
-          }
-        />
-        <select
-          value={tenantForm.property}
-          onChange={(e) =>
-            setTenantForm({ ...tenantForm, property: e.target.value })
-          }
-        >
-          <option value="">Select Property</option>
-          {properties.map((p) => (
-            <option key={p._id} value={p.name}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <button type="submit">➕ Add Tenant</button>
-      </form>
-
-      {tenants.length > 0 && (
-        <div className="tenant-list">
-          <h4>🧑‍💼 Tenants:</h4>
-          <ul>
-            {tenants.map((t) => (
-              <li key={t._id}>
-                {t.name} ({t.unit}) — {t.propertyId}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {status && <p className="status">{status}</p>}
+        {status && <p className="status">{status}</p>}
+      </div>
     </div>
   );
 }

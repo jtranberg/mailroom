@@ -250,3 +250,9 @@ textarea:focus {
   box-shadow: 0 12px 30px rgba(0,0,0,0.35);
   border: 1px solid var(--card-border);
 }
+
+
+.tenant-form input::placeholder,
+.tenant-form textarea::placeholder {
+  color: rgba(51, 39, 39, 0.55);
+}
