@@ -184,17 +184,18 @@ export default function App() {
         ))}
       </div>
 
-     {selectedProperty.tenants.length === 0 ? (
-  <p className="subtle">No tenants yet for this property.</p>
-) : (
-  <div className="button-group">
-    {selectedProperty.tenants.map((tenant) => (
-      <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
-        {tenant.name} – Unit {tenant.unit}
-      </button>
-    ))}
-  </div>
-)}
+      {selectedProperty && (
+        <>
+          <h2>2. Choose Tenant</h2>
+          <div className="button-group">
+            {selectedProperty.tenants.map((tenant) => (
+              <button key={tenant.id} onClick={() => handleTenantSelect(tenant)}>
+                {tenant.name} – Unit {tenant.unit}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {selectedTenant && (
         <>
