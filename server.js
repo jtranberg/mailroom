@@ -11,7 +11,7 @@ import Document from "./models/Document.js";
 import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
-
+import webflowPropertiesRoutes from "./routes/webflowProperties.routes.js";
 
 dotenv.config();
 
@@ -27,6 +27,8 @@ const allowedOrigins = [
   "https://mailroom-portal.netlify.app",
   "https://document-portal.netlify.app",
 ];
+
+app.use("/api/webflow", webflowPropertiesRoutes);
 
 app.use(
   cors({

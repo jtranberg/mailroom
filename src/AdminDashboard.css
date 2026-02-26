@@ -215,3 +215,48 @@
     align-items: flex-start;
   }
 }
+.file-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.file-button {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 700;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.7);
+  transition: 0.15s ease;
+}
+
+.file-button:hover {
+  filter: brightness(1.05);
+}
+
+.file-name {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.property-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.property-open:hover {
+  filter: brightness(1.02);
+}
+
+.property-open:active {
+  transform: translateY(1px);
+}
