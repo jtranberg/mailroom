@@ -1,60 +1,17 @@
+/* index.css — keep this tiny and neutral */
 
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
 
 body {
   margin: 0;
-  color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-  background: radial-gradient(900px 700px at 15% 10%, rgba(124, 58, 237, 0.25), transparent 55%),
-              radial-gradient(800px 600px at 85% 25%, rgba(34, 211, 238, 0.20), transparent 55%),
-              radial-gradient(900px 700px at 50% 95%, rgba(124, 58, 237, 0.12), transparent 60%),
-              var(--bg0);
-  min-height: 100vh;
 }
 
-
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* links: let App.css control theme color */
+a {
+  color: inherit;
+  text-decoration: none;
 }
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+a:hover {
+  text-decoration: underline;
 }

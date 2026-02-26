@@ -50,18 +50,22 @@ a:hover { text-decoration: underline; }
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
+  margin-top: 50px;
   padding: 22px 18px 60px;
+  background-color: #f7fbfc;
+  border-radius: 10px;
+ 
 }
 
 /* Primary glass card wrapper */
-.card {
+/* .card {
   border: 1px solid var(--stroke2);
   border-radius: var(--r-lg);
   background: rgba(255,255,255,0.72);
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow2);
   padding: 16px;
-}
+} */
 
 .card:hover { border-color: rgba(20, 16, 10, 0.22); }
 

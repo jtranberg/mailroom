@@ -12,6 +12,7 @@ import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
 
+
 dotenv.config();
 
 const app = express();
@@ -356,6 +357,7 @@ app.delete("/api/properties/:propertyId", async (req, res) => {
    NOTES (Admin-only, internal)
 ========================================================= */
 
+
 // GET: Fetch notes for a tenant (works for active OR archived)
 app.get("/api/tenants/:tenantId/notes", async (req, res) => {
   try {
@@ -367,6 +369,8 @@ app.get("/api/tenants/:tenantId/notes", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch notes", details: err.message });
   }
 });
+
+
 
 // POST: Add a note for a tenant
 app.post("/api/tenants/:tenantId/notes", async (req, res) => {
