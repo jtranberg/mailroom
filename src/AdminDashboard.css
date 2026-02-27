@@ -1,18 +1,20 @@
 /* src/AdminDashboard.css
-   ADMIN DASHBOARD — PARCHMENT THEME (SCOPED)
-   Notes:
-   - Wrapper: .admin-page (full page background)
-   - Card/Container: .admin-container (your rendered white panel)
+   ADMIN DASHBOARD — ANA PALETTE (SCOPED)
+   Wrapper: .admin-page
+   Card/Container: .admin-container
 */
 
 .admin-page {
   min-height: 100vh;
   width: 100%;
   color: var(--text);
+
+  /* ✅ brand-blue + neutral glow (no amber/sky) */
   background:
-    radial-gradient(900px 700px at 20% 0%, rgba(217, 119, 6, 0.18), transparent 55%),
-    radial-gradient(800px 600px at 90% 20%, rgba(14, 165, 233, 0.14), transparent 55%),
+    radial-gradient(900px 700px at 20% 0%, rgba(0, 67, 133, 0.14), transparent 58%),
+    radial-gradient(800px 600px at 90% 20%, rgba(47, 43, 45, 0.06), transparent 60%),
     var(--bg0);
+
   overflow-x: hidden;
   box-sizing: border-box;
 }
@@ -24,12 +26,9 @@
   margin: 80px auto 60px;
   padding: 24px;
 
-  /* border-radius: 24px; */
   border: 1px solid var(--stroke2);
-
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(12px);
-  /* box-shadow: var(--shadow); */
 
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
   color: var(--text);
@@ -89,7 +88,6 @@
 .admin-page textarea {
   width: 100%;
   padding: 10px 12px;
-  /* border-radius: 12px; */
   border: 1px solid var(--stroke2);
   background: rgba(255, 255, 255, 0.88);
   color: var(--text) !important;
@@ -100,38 +98,39 @@
 
 .admin-page input::placeholder,
 .admin-page textarea::placeholder {
-  color: rgba(20, 16, 10, 0.45) !important;
+  color: rgba(74, 75, 77, 0.55) !important;
 }
 
 /* Dropdown options */
 .admin-page select option {
   background: #fff;
-  color: rgba(20, 16, 10, 0.92);
+  color: var(--text);
 }
 
-/* Focus */
+/* ✅ Focus */
 .admin-page input:focus,
 .admin-page select:focus,
 .admin-page textarea:focus {
-  border-color: rgba(217, 119, 6, 0.45);
-  /* box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12); */
+  border-color: rgba(0, 67, 133, 0.55);
+  box-shadow: 0 0 0 3px rgba(0, 67, 133, 0.12);
 }
 
-/* Buttons (default) */
+/* ✅ Buttons (default) — BRAND BLUE */
 .admin-page button {
   padding: 10px 14px;
-  /* border-radius: 14px; */
-  border: 1px solid rgba(217, 119, 6, 0.35);
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.95), rgba(14, 165, 233, 0.7));
-  color: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: var(--button-text);
   font-weight: 800;
   cursor: pointer;
-  /* box-shadow: var(--shadow2); */
-  transition: transform 0.08s ease, filter 0.12s ease, opacity 0.12s ease;
+  transition: transform 0.08s ease, filter 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
 }
 
 .admin-page button:hover {
-  filter: brightness(1.05);
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+  filter: brightness(1.02);
+  box-shadow: var(--shadow2);
 }
 
 .admin-page button:active {
@@ -141,15 +140,21 @@
 .admin-page button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-/* Back button */
+/* Back button (neutral) */
 .admin-page .back-button {
   border: 1px solid var(--stroke);
   background: rgba(255, 255, 255, 0.55);
   color: var(--text) !important;
   box-shadow: none;
   font-weight: 800;
+}
+
+.admin-page .back-button:hover {
+  border-color: rgba(0, 67, 133, 0.28);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 /* Status text */
@@ -169,13 +174,12 @@
   margin-top: 10px;
 }
 
-/* Danger buttons */
+/* Danger buttons (keep red) */
 .admin-page .danger-button {
-  border: 1px solid rgba(220, 38, 38, 0.35);
-  background: rgba(220, 38, 38, 0.12);
-  color: rgba(20, 16, 10, 0.92);
+  border: 1px solid rgba(179, 38, 30, 0.35);
+  background: rgba(179, 38, 30, 0.12);
+  color: var(--text);
   font-weight: 900;
-  /* border-radius: 14px; */
   padding: 10px 12px;
   cursor: pointer;
 }
@@ -203,18 +207,7 @@
   padding: 6px 0;
 }
 
-/* Responsive */
-@media (max-width: 640px) {
-  .admin-container {
-    margin: 20px;
-    padding: 16px;
-  }
-
-  .admin-page .admin-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
+/* File upload */
 .file-upload {
   display: flex;
   align-items: center;
@@ -229,10 +222,12 @@
   border: 1px solid var(--stroke);
   background: rgba(255, 255, 255, 0.7);
   transition: 0.15s ease;
+  color: var(--text);
 }
 
 .file-button:hover {
-  filter: brightness(1.05);
+  border-color: rgba(0, 67, 133, 0.28);
+  filter: brightness(1.03);
 }
 
 .file-name {
@@ -240,6 +235,7 @@
   color: var(--muted);
 }
 
+/* Property open row */
 .property-open {
   display: flex;
   align-items: center;
@@ -259,4 +255,17 @@
 
 .property-open:active {
   transform: translateY(1px);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .admin-container {
+    margin: 20px;
+    padding: 16px;
+  }
+
+  .admin-page .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
