@@ -45,7 +45,7 @@ app.options(/.*/, cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
-// MongoDB Connection
+// MongoDB Connection...
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
