@@ -23,11 +23,21 @@ export default function ManageProperties({
     photoUrl: "",
   });
 
-  // ✅ CSV update UI state
+  // ✅ CSV update UI state (PROPERTIES)
   const [csvFile, setCsvFile] = useState(null);
-  const [matchKey, setMatchKey] = useState("unit_id"); // safest default
+
+  // ✅ PROPERTIES CSV matchKey should default to item_id (matches your working curl)
+  const [matchKey, setMatchKey] = useState("item_id");
   const [dryRun, setDryRun] = useState(true); // start safe
   const [csvBusy, setCsvBusy] = useState(false);
+
+  // ✅ Syndicator tenantId is NOT the same as Mongo tenant _id.
+  // Your working curl uses tenantId=demo, so default to that.
+  // Later we can make a dropdown if you add more syndicator tenants.
+  const [syndicatorTenantId, setSyndicatorTenantId] = useState("demo");
+
+  // ✅ Optional: show backend errors/preview rows right in UI
+  const [csvReport, setCsvReport] = useState(null);
 
   const propertyHasTenants = useMemo(() => {
     const map = {};
@@ -36,9 +46,6 @@ export default function ManageProperties({
     }
     return map;
   }, [properties, tenants]);
-
-  // ✅ choose a tenantId source (placeholder: first tenant)
-  const tenantId = tenants?.[0]?._id || "";
 
   // ✅ helper: parse response no matter what (JSON or text)
   async function readResponse(res) {
@@ -165,19 +172,21 @@ export default function ManageProperties({
     }
   };
 
-  // ✅ CSV PREVIEW (no write)
+  // ✅ CSV PREVIEW (no write) — PROPERTIES ROUTE
   const handleCsvPreview = async () => {
+    setCsvReport(null);
+
     if (!SYNDICATOR_BASE) {
       return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
     }
     if (!csvFile) return setStatus("❌ Please choose a CSV file first.");
-    if (!tenantId) return setStatus("❌ Missing tenantId (no tenants loaded/selected).");
+    if (!syndicatorTenantId) return setStatus("❌ Missing syndicator tenantId.");
 
     setCsvBusy(true);
-    setStatus("🔎 Previewing CSV…");
+    setStatus("🔎 Previewing Properties CSV…");
 
     console.log("SYNDICATOR_BASE:", SYNDICATOR_BASE);
-    console.log("Preview URL:", `${SYNDICATOR_BASE}/api/import/csv`);
+    console.log("Preview URL:", `${SYNDICATOR_BASE}/api/import/properties/csv`);
 
     const reachable = await pingSyndicator();
     if (!reachable) {
@@ -188,12 +197,12 @@ export default function ManageProperties({
     try {
       const fd = new FormData();
       fd.append("file", csvFile);
-      fd.append("tenantId", tenantId);
+      fd.append("tenantId", syndicatorTenantId);
       fd.append("matchKey", matchKey);
       fd.append("mode", "update-only");
       fd.append("dryRun", "true");
 
-      const res = await fetch(`${SYNDICATOR_BASE}/api/import/csv`, {
+      const res = await fetch(`${SYNDICATOR_BASE}/api/import/properties/csv`, {
         method: "POST",
         headers: { "x-admin-key": "wallsecure" },
         body: fd,
@@ -203,11 +212,21 @@ export default function ManageProperties({
 
       if (!res.ok) {
         console.error("CSV PREVIEW FAIL:", res.status, raw);
-        return setStatus(`❌ Preview failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
+        setStatus(`❌ Preview failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
+        return;
       }
 
+      setCsvReport({
+        mode: "preview",
+        runId: data?.runId,
+        summary: data?.summary,
+        headers: data?.headers,
+        preview: data?.preview,
+        applied: data?.applied,
+      });
+
       setStatus(
-        `✅ Preview OK — rows: ${data?.summary?.rows}, valid: ${data?.summary?.valid}, errors: ${data?.summary?.errors}`
+        `✅ Preview OK — rows: ${data?.summary?.rows ?? "?"} (matchKey: ${data?.summary?.matchKey ?? matchKey})`
       );
     } catch (err) {
       setStatus(`❌ Preview failed: ${err.message}`);
@@ -216,33 +235,37 @@ export default function ManageProperties({
     }
   };
 
-  // ✅ CSV APPLY (writes to Webflow if dryRun=false)
+  // ✅ CSV APPLY (writes to Webflow if dryRun=false) — PROPERTIES ROUTE
   const handleCsvApplyUpdate = async () => {
+    setCsvReport(null);
+
     if (!SYNDICATOR_BASE) {
       return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
     }
     if (!csvFile) return setStatus("❌ Please choose a CSV file first.");
-    if (!tenantId) return setStatus("❌ Missing tenantId (no tenants loaded/selected).");
+    if (!syndicatorTenantId) return setStatus("❌ Missing syndicator tenantId.");
 
     const ok = window.confirm(
-      `Apply CSV update to Webflow Units?\n\nmatchKey: ${matchKey}\ndryRun: ${dryRun ? "true" : "false"}`
+      `Apply CSV update to Webflow PROPERTIES?\n\ntenantId: ${syndicatorTenantId}\nmatchKey: ${matchKey}\ndryRun: ${
+        dryRun ? "true" : "false"
+      }`
     );
     if (!ok) return;
 
     setCsvBusy(true);
-    setStatus(dryRun ? "🧪 Dry run applying…" : "🚀 Applying CSV updates to Webflow…");
+    setStatus(dryRun ? "🧪 Dry run applying (Properties)..." : "🚀 Applying CSV updates to Webflow (Properties)…");
 
-    console.log("Apply URL:", `${SYNDICATOR_BASE}/api/import/csv/apply`);
+    console.log("Apply URL:", `${SYNDICATOR_BASE}/api/import/properties/csv/apply`);
 
     try {
       const fd = new FormData();
       fd.append("file", csvFile);
-      fd.append("tenantId", tenantId);
+      fd.append("tenantId", syndicatorTenantId);
       fd.append("matchKey", matchKey);
       fd.append("mode", "update-only");
       fd.append("dryRun", dryRun ? "true" : "false");
 
-      const res = await fetch(`${SYNDICATOR_BASE}/api/import/csv/apply`, {
+      const res = await fetch(`${SYNDICATOR_BASE}/api/import/properties/csv/apply`, {
         method: "POST",
         headers: { "x-admin-key": "wallsecure" },
         body: fd,
@@ -252,13 +275,36 @@ export default function ManageProperties({
 
       if (!res.ok) {
         console.error("CSV APPLY FAIL:", res.status, raw);
-        return setStatus(`❌ Apply failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
+        setStatus(`❌ Apply failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
+        return;
       }
 
+      setCsvReport({
+        mode: "apply",
+        runId: data?.runId,
+        summary: data?.summary,
+        headers: data?.headers,
+        preview: data?.preview,
+        applied: data?.applied,
+      });
+
       const a = data?.applied || {};
-      setStatus(
-        `✅ CSV Applied — updated: ${a.updated || 0}, skipped: ${a.skipped || 0}, missing: ${a.missing?.length || 0}, errors: ${a.errors?.length || 0}`
-      );
+      const errCount = a.errors?.length || 0;
+
+      if (errCount) {
+        console.warn("CSV APPLY ERRORS:", a.errors);
+        setStatus(
+          `⚠️ CSV Applied with errors — updated: ${a.updated || 0}, skipped: ${a.skipped || 0}, missing: ${
+            a.missing?.length || 0
+          }, errors: ${errCount} (see panel below)`
+        );
+      } else {
+        setStatus(
+          `✅ CSV Applied — updated: ${a.updated || 0}, skipped: ${a.skipped || 0}, missing: ${
+            a.missing?.length || 0
+          }, errors: 0`
+        );
+      }
     } catch (err) {
       setStatus(`❌ Apply failed: ${err.message}`);
     } finally {
@@ -275,16 +321,24 @@ export default function ManageProperties({
         </button>
       </div>
 
-      {/* ✅ Bulk CSV update panel */}
+      {/* ✅ Bulk CSV update panel (PROPERTIES) */}
       <div className="card" style={{ marginTop: 12 }}>
-        <h4 style={{ marginTop: 0 }}>📄 Bulk Update Units (CSV)</h4>
+        <h4 style={{ marginTop: 0 }}>📄 Bulk Update Properties (CSV)</h4>
 
-        <div className="file-upload">
+        <div className="file-upload" style={{ flexWrap: "wrap" }}>
           <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} />
 
+          {/* ✅ Syndicator tenantId (matches your curl tenantId=demo) */}
+          <input
+            type="text"
+            value={syndicatorTenantId}
+            onChange={(e) => setSyndicatorTenantId(e.target.value)}
+            placeholder="tenantId (e.g., demo)"
+            style={{ minWidth: 180 }}
+          />
+
           <select value={matchKey} onChange={(e) => setMatchKey(e.target.value)}>
-            <option value="unit_id">match: unit_id (best)</option>
-            <option value="unit_number">match: unit_number (ideally include property_id)</option>
+            <option value="item_id">match: item_id (best)</option>
             <option value="slug">match: slug</option>
             <option value="name">match: name</option>
           </select>
@@ -299,7 +353,7 @@ export default function ManageProperties({
           </button>
 
           <button type="button" disabled={csvBusy} onClick={handleCsvApplyUpdate}>
-            ✅ Update Units
+            ✅ Update Properties
           </button>
         </div>
 
@@ -315,9 +369,45 @@ export default function ManageProperties({
           </div>
         )}
 
-        {!tenantId && (
-          <div className="subtle" style={{ marginTop: 8 }}>
-            ⚠️ No tenantId detected yet (load/select a tenant).
+        {/* ✅ Show helpful response details (runId, summary, errors) */}
+        {csvReport && (
+          <div style={{ marginTop: 12 }}>
+            <div className="subtle">
+              <b>Run:</b> {csvReport.mode} {csvReport.runId ? `— ${csvReport.runId}` : ""}
+            </div>
+
+            {!!csvReport?.summary && (
+              <div className="subtle" style={{ marginTop: 6 }}>
+                <b>Summary:</b>{" "}
+                {typeof csvReport.summary?.rows !== "undefined" ? `rows=${csvReport.summary.rows}` : ""}{" "}
+                {csvReport.summary?.matchKey ? `• matchKey=${csvReport.summary.matchKey}` : ""}
+              </div>
+            )}
+
+            {!!csvReport?.applied && (
+              <div className="subtle" style={{ marginTop: 6 }}>
+                <b>Applied:</b> updated={csvReport.applied.updated || 0} • skipped={csvReport.applied.skipped || 0} •
+                missing={csvReport.applied.missing?.length || 0} • errors={csvReport.applied.errors?.length || 0}
+              </div>
+            )}
+
+            {!!csvReport?.applied?.errors?.length && (
+              <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(255,0,0,0.06)" }}>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>⚠️ Errors</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {csvReport.applied.errors.slice(0, 10).map((err, idx) => (
+                    <li key={idx} className="subtle">
+                      {typeof err === "string" ? err : JSON.stringify(err)}
+                    </li>
+                  ))}
+                </ul>
+                {csvReport.applied.errors.length > 10 && (
+                  <div className="subtle" style={{ marginTop: 6 }}>
+                    Showing first 10 of {csvReport.applied.errors.length}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
