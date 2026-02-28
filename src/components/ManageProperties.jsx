@@ -10,7 +10,12 @@ export default function ManageProperties({
   setStatus,
   onOpenProperty,
 }) {
-  const SYNDICATOR_BASE = import.meta.env.VITE_SYNDICATOR_URL || API_BASE;
+  // ✅ IMPORTANT: do NOT fall back to API_BASE (DocuCenter backend)
+  const SYNDICATOR_BASE = import.meta.env.VITE_SYNDICATOR_URL;
+
+  if (!SYNDICATOR_BASE) {
+    console.warn("Missing VITE_SYNDICATOR_URL — CSV preview/apply will not work.");
+  }
 
   const [form, setForm] = useState({
     name: "",
@@ -33,7 +38,31 @@ export default function ManageProperties({
   }, [properties, tenants]);
 
   // ✅ choose a tenantId source (placeholder: first tenant)
-  const tenantId = tenants?.[0]?._id || ""; // <-- swap if you have a real selected tenant/admin tenantId
+  const tenantId = tenants?.[0]?._id || "";
+
+  // ✅ helper: parse response no matter what (JSON or text)
+  async function readResponse(res) {
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      // not JSON, keep raw
+    }
+    return { raw, data };
+  }
+
+  // ✅ helper: ping syndicator to confirm reachable (health route)
+  async function pingSyndicator() {
+    try {
+      const url = `${SYNDICATOR_BASE}/api/health`;
+      console.log("PING:", url);
+      const res = await fetch(url);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
 
   const handleRepairPropertyLinks = async () => {
     setStatus("🛠 Repairing tenant property links...");
@@ -69,6 +98,10 @@ export default function ManageProperties({
   const handleAddProperty = async (e) => {
     e.preventDefault();
 
+    if (!SYNDICATOR_BASE) {
+      return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
+    }
+
     const name = form.name.trim();
     const suite = form.suite.trim();
     const photoUrl = form.photoUrl.trim();
@@ -85,15 +118,16 @@ export default function ManageProperties({
         body: JSON.stringify({ name, suite, photoUrl }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const { raw, data } = await readResponse(res);
 
       if (!res.ok) {
-        setStatus(`❌ Add failed: ${data?.error || `Server error (${res.status})`}`);
+        console.error("ADD PROPERTY FAIL:", res.status, raw);
+        setStatus(`❌ Add failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
         return;
       }
 
-      setStatus(`✅ Property "${data.property.name}" added`);
-      setProperties((prev) => [...prev, data.property]);
+      setStatus(`✅ Property "${data.property?.name || name}" added`);
+      if (data?.property) setProperties((prev) => [...prev, data.property]);
       setForm({ name: "", suite: "", photoUrl: "" });
     } catch (err) {
       setStatus(`⚠️ Syndicator offline (properties unavailable): ${err.message}`);
@@ -103,20 +137,24 @@ export default function ManageProperties({
   const handleDeleteProperty = async (p) => {
     if (propertyHasTenants[p._id]) return;
 
+    if (!SYNDICATOR_BASE) {
+      return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
+    }
+
     const ok = window.confirm(`Delete property "${p.name}"?\n\nThis cannot be undone.`);
     if (!ok) return;
 
     try {
       const res = await fetch(`${SYNDICATOR_BASE}/api/webflow/properties/${p._id}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-key": "wallsecure",
-        },
+        headers: { "x-admin-key": "wallsecure" },
       });
 
+      const { raw, data } = await readResponse(res);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setStatus(`❌ Delete failed: ${data?.error || res.status}`);
+        console.error("DELETE PROPERTY FAIL:", res.status, raw);
+        setStatus(`❌ Delete failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
         return;
       }
 
@@ -129,11 +167,23 @@ export default function ManageProperties({
 
   // ✅ CSV PREVIEW (no write)
   const handleCsvPreview = async () => {
+    if (!SYNDICATOR_BASE) {
+      return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
+    }
     if (!csvFile) return setStatus("❌ Please choose a CSV file first.");
     if (!tenantId) return setStatus("❌ Missing tenantId (no tenants loaded/selected).");
 
     setCsvBusy(true);
     setStatus("🔎 Previewing CSV…");
+
+    console.log("SYNDICATOR_BASE:", SYNDICATOR_BASE);
+    console.log("Preview URL:", `${SYNDICATOR_BASE}/api/import/csv`);
+
+    const reachable = await pingSyndicator();
+    if (!reachable) {
+      setCsvBusy(false);
+      return setStatus("❌ Cannot reach Syndicator backend (/api/health failed). Check URL/CORS/Render.");
+    }
 
     try {
       const fd = new FormData();
@@ -149,8 +199,12 @@ export default function ManageProperties({
         body: fd,
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return setStatus(`❌ Preview failed: ${data?.error || res.status}`);
+      const { raw, data } = await readResponse(res);
+
+      if (!res.ok) {
+        console.error("CSV PREVIEW FAIL:", res.status, raw);
+        return setStatus(`❌ Preview failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
+      }
 
       setStatus(
         `✅ Preview OK — rows: ${data?.summary?.rows}, valid: ${data?.summary?.valid}, errors: ${data?.summary?.errors}`
@@ -164,6 +218,9 @@ export default function ManageProperties({
 
   // ✅ CSV APPLY (writes to Webflow if dryRun=false)
   const handleCsvApplyUpdate = async () => {
+    if (!SYNDICATOR_BASE) {
+      return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
+    }
     if (!csvFile) return setStatus("❌ Please choose a CSV file first.");
     if (!tenantId) return setStatus("❌ Missing tenantId (no tenants loaded/selected).");
 
@@ -174,6 +231,8 @@ export default function ManageProperties({
 
     setCsvBusy(true);
     setStatus(dryRun ? "🧪 Dry run applying…" : "🚀 Applying CSV updates to Webflow…");
+
+    console.log("Apply URL:", `${SYNDICATOR_BASE}/api/import/csv/apply`);
 
     try {
       const fd = new FormData();
@@ -189,8 +248,12 @@ export default function ManageProperties({
         body: fd,
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return setStatus(`❌ Apply failed: ${data?.error || res.status}`);
+      const { raw, data } = await readResponse(res);
+
+      if (!res.ok) {
+        console.error("CSV APPLY FAIL:", res.status, raw);
+        return setStatus(`❌ Apply failed (${res.status}): ${data?.error || raw || "Unknown error"}`);
+      }
 
       const a = data?.applied || {};
       setStatus(
@@ -217,11 +280,7 @@ export default function ManageProperties({
         <h4 style={{ marginTop: 0 }}>📄 Bulk Update Units (CSV)</h4>
 
         <div className="file-upload">
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
-          />
+          <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} />
 
           <select value={matchKey} onChange={(e) => setMatchKey(e.target.value)}>
             <option value="unit_id">match: unit_id (best)</option>
@@ -231,11 +290,7 @@ export default function ManageProperties({
           </select>
 
           <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={dryRun}
-              onChange={(e) => setDryRun(e.target.checked)}
-            />
+            <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
             Dry run
           </label>
 
@@ -253,6 +308,13 @@ export default function ManageProperties({
             Selected: {csvFile.name}
           </div>
         )}
+
+        {!SYNDICATOR_BASE && (
+          <div className="subtle" style={{ marginTop: 8 }}>
+            ⚠️ Missing <b>VITE_SYNDICATOR_URL</b> — set it in Netlify env vars and redeploy.
+          </div>
+        )}
+
         {!tenantId && (
           <div className="subtle" style={{ marginTop: 8 }}>
             ⚠️ No tenantId detected yet (load/select a tenant).
@@ -304,12 +366,7 @@ export default function ManageProperties({
                       <img
                         src={p.photoUrl}
                         alt={p.name}
-                        style={{
-                          width: 44,
-                          height: 44,
-                          objectFit: "cover",
-                          borderRadius: 10,
-                        }}
+                        style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 10 }}
                       />
                     )}
 
@@ -323,11 +380,7 @@ export default function ManageProperties({
                     type="button"
                     className="danger-button small"
                     disabled={hasTenants}
-                    title={
-                      hasTenants
-                        ? "Cannot delete: tenants still linked to this property"
-                        : "Delete property"
-                    }
+                    title={hasTenants ? "Cannot delete: tenants still linked to this property" : "Delete property"}
                     onClick={() => handleDeleteProperty(p)}
                   >
                     🗑 Remove
