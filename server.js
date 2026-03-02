@@ -11,6 +11,7 @@ import Document from "./models/Document.js";
 import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
+import importProxyRoutes from "./routes/importProxy.routes.js";
 
 
 dotenv.config();
@@ -44,6 +45,7 @@ app.use(
 app.options(/.*/, cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/api", importProxyRoutes);
 
 // MongoDB Connection...
 mongoose
