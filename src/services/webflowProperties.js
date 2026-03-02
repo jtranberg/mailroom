@@ -1,28 +1,34 @@
 // server/services/webflowProperties.js
 import { WebflowClient } from "../webflow/client.js";
 
-const COLLECTION_ID = process.env.WEBFLOW_COLLECTION_PROPERTIES;
-
-// ✅ Update these slugs to match your Webflow Properties collection fields
+// Webflow Properties field slugs (adjust if yours differ)
 const FIELDS = {
-  name: "name",          // Property name field slug (often "name")
-  suite: "suite",        // e.g. "suite" or "suite-number"
-  photoUrl: "photo-url", // e.g. "photo-url" (PlainText) for now
+  name: "name",
+  suite: "suite",
+  photoUrl: "photo-url",
 };
 
-function assertConfig() {
-  if (!process.env.WEBFLOW_TOKEN) throw new Error("Missing WEBFLOW_TOKEN env var");
-  if (!COLLECTION_ID) throw new Error("Missing WEBFLOW_COLLECTION_PROPERTIES env var");
+function mustEnv(name) {
+  const v = process.env[name];
+  if (!v) throw new Error(`${name} not set`);
+  return v;
+}
+
+function getClient() {
+  // ✅ IMPORTANT: your TS client expects WEBFLOW_API_TOKEN (not WEBFLOW_TOKEN)
+  const token = process.env.WEBFLOW_API_TOKEN || process.env.WEBFLOW_TOKEN;
+  if (!token) throw new Error("Missing WEBFLOW_API_TOKEN env var");
+  return new WebflowClient(token);
 }
 
 function toProperty(item) {
   const fd = item?.fieldData || {};
   return {
-    _id: item?.id,               // keep your frontend happy
+    _id: item?.id,
     webflowId: item?.id,
-    name: fd[FIELDS.name] || "",
-    suite: fd[FIELDS.suite] || "",
-    photoUrl: fd[FIELDS.photoUrl] || "",
+    name: String(fd[FIELDS.name] || ""),
+    suite: String(fd[FIELDS.suite] || ""),
+    photoUrl: String(fd[FIELDS.photoUrl] || ""),
     isDraft: !!item?.isDraft,
     isArchived: !!item?.isArchived,
     lastPublished: item?.lastPublished,
@@ -31,45 +37,45 @@ function toProperty(item) {
 }
 
 export async function listWebflowProperties() {
-  assertConfig();
-  const wf = new WebflowClient({ token: process.env.WEBFLOW_TOKEN });
+  const collectionId = mustEnv("WEBFLOW_COLLECTION_PROPERTIES");
+  const wf = getClient();
 
-  // Webflow v2: GET /collections/:collectionId/items
-  const data = await wf.request(`/collections/${COLLECTION_ID}/items`, { method: "GET" });
-  const items = Array.isArray(data?.items) ? data.items : [];
+  // ✅ use public method from your TS client
+  const items = await wf.fetchAllItems(collectionId, {
+    includeDrafts: true,
+    includeArchived: true,
+  });
+
   return items.map(toProperty);
 }
 
 export async function createWebflowProperty({ name, suite = "", photoUrl = "" }) {
-  assertConfig();
-  const wf = new WebflowClient({ token: process.env.WEBFLOW_TOKEN });
+  const collectionId = mustEnv("WEBFLOW_COLLECTION_PROPERTIES");
+  const wf = getClient();
 
-  const payload = {
-    isDraft: false,
+  const created = await wf.createItem(collectionId, {
     fieldData: {
       [FIELDS.name]: name,
       [FIELDS.suite]: suite,
       [FIELDS.photoUrl]: photoUrl,
     },
-  };
-
-  const created = await wf.request(`/collections/${COLLECTION_ID}/items`, {
-    method: "POST",
-    body: payload,
   });
 
-  // v2 usually returns the created item (or an object containing it)
-  const item = created?.item || created;
-  return toProperty(item);
+  return toProperty(created);
 }
 
 export async function deleteWebflowProperty(itemId) {
-  assertConfig();
-  const wf = new WebflowClient({ token: process.env.WEBFLOW_TOKEN });
+  const collectionId = mustEnv("WEBFLOW_COLLECTION_PROPERTIES");
+  const wf = getClient();
 
-  await wf.request(`/collections/${COLLECTION_ID}/items/${itemId}`, {
-    method: "DELETE",
-  });
+  // ✅ Your TS client didn't include deleteItem yet, so we do one of these:
+  // Option A (recommended): add deleteItem() to client.ts
+  // Option B: temporarily use updateItem() to archive, but that's not delete.
 
+  if (typeof wf.deleteItem !== "function") {
+    throw new Error("WebflowClient.deleteItem is not implemented. Add it to src/webflow/client.ts");
+  }
+
+  await wf.deleteItem(collectionId, itemId);
   return { ok: true };
 }
