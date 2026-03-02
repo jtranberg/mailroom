@@ -11,7 +11,7 @@ import Document from "./models/Document.js";
 import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
-import webflowPropertiesRoutes from "./routes/webflowproperties.routes.js";
+
 
 dotenv.config();
 
@@ -44,7 +44,7 @@ app.use(
 app.options(/.*/, cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-app.use("/api/webflow", webflowPropertiesRoutes);
+
 // MongoDB Connection...
 mongoose
   .connect(process.env.MONGO_URI)
