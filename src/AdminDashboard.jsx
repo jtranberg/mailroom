@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+// AdminDashboard.jsx
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminDashboard.css";
 import ManageProperties from "./components/ManageProperties";
@@ -22,49 +23,85 @@ export default function AdminDashboard() {
   });
 
   const navigate = useNavigate();
+
+  // ✅ Mailroom/DocuCenter API (tenants, documents, notes)
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-  const SYNDICATOR_BASE = import.meta.env.VITE_SYNDICATOR_URL || API_BASE;
+
+  // ✅ Syndicator (ana-api) (Webflow properties + CSV import)
+  // IMPORTANT: ana-api IS the syndicator server
+  const SYNDICATOR_BASE = import.meta.env.VITE_SYNDICATOR_URL || "";
+
+  // ✅ UI warning if env not set
+  useEffect(() => {
+    if (!import.meta.env.VITE_SYNDICATOR_URL) {
+      console.warn("Missing VITE_SYNDICATOR_URL — properties + CSV import will not work.");
+    }
+  }, []);
 
   // Map for quick lookup: propertyId -> property object
   const propertyById = useMemo(() => {
     return Object.fromEntries(properties.map((p) => [p._id, p]));
   }, [properties]);
 
+  // ✅ helper: parse response as JSON-or-text
+  async function readResponse(res) {
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      // keep raw
+    }
+    return { raw, data };
+  }
+
   // ✅ fetch helpers (also used after repair)
-  async function fetchTenants() {
+  const fetchTenants = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/tenants`);
-      const data = await res.json();
-      if (res.ok) setTenants(Array.isArray(data) ? data : []);
+      const { raw, data } = await readResponse(res);
+
+      if (!res.ok) {
+        console.error("TENANTS FAIL:", res.status, raw);
+        setStatus(`❌ Tenants failed (${res.status}): ${data?.error || raw}`);
+        return;
+      }
+
+      setTenants(Array.isArray(data) ? data : []);
     } catch (err) {
       setStatus(`❌ Failed to load tenants: ${err.message}`);
     }
-  }
+  }, [API_BASE]);
 
- async function fetchProperties() {
-  try {
-    const res = await fetch(`${SYNDICATOR_BASE}/api/webflow/properties`);
-    const raw = await res.text();
-    let data = {};
-    try { data = JSON.parse(raw); } catch { /* empty */ }
-
-    if (!res.ok) {
-      console.error("PROPERTIES FAIL:", res.status, raw);
-      setStatus(`❌ Properties failed (${res.status}): ${data?.error || raw}`);
+  const fetchProperties = useCallback(async () => {
+    if (!SYNDICATOR_BASE) {
+      setStatus("⚠️ Missing VITE_SYNDICATOR_URL — cannot load properties.");
       return;
     }
 
-    setProperties(Array.isArray(data) ? data : []);
-  } catch (err) {
-    setStatus(`⚠️ Properties service offline: ${err.message}`);
-  }
-}
+    try {
+      const res = await fetch(`${SYNDICATOR_BASE}/api/webflow/properties`);
+      const { raw, data } = await readResponse(res);
 
+      if (!res.ok) {
+        console.error("PROPERTIES FAIL:", res.status, raw);
+        setStatus(`❌ Properties failed (${res.status}): ${data?.error || raw}`);
+        return;
+      }
+
+      // ✅ Expecting an array of normalized objects containing _id
+      setProperties(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setStatus(`⚠️ Properties service offline: ${err.message}`);
+    }
+  }, [SYNDICATOR_BASE]);
+
+  // ✅ load on mount + when API_BASE changes
+  // (properties depends on SYNDICATOR_BASE, but that comes from env and won’t change at runtime)
   useEffect(() => {
     fetchTenants();
     fetchProperties();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_BASE]);
+  }, [fetchTenants, fetchProperties]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -194,6 +231,12 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        {!SYNDICATOR_BASE && (
+          <p className="status">
+            ⚠️ Missing <b>VITE_SYNDICATOR_URL</b> — properties + CSV import disabled until set in Netlify env vars.
+          </p>
+        )}
+
         <form onSubmit={handleUpload}>
           <h3>Upload PDF Document</h3>
           <input
@@ -202,17 +245,8 @@ export default function AdminDashboard() {
             value={type}
             onChange={(e) => setType(e.target.value)}
           />
-          <input
-            type="text"
-            placeholder="Label"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-          <input
-            type="file"
-            accept="application/pdf"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
+          <input type="text" placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
           <button type="submit">📤 Upload Document</button>
         </form>
 
@@ -283,10 +317,7 @@ export default function AdminDashboard() {
             onChange={(e) => setTenantForm({ ...tenantForm, unit: e.target.value })}
           />
 
-          <select
-            value={tenantForm.property}
-            onChange={(e) => setTenantForm({ ...tenantForm, property: e.target.value })}
-          >
+          <select value={tenantForm.property} onChange={(e) => setTenantForm({ ...tenantForm, property: e.target.value })}>
             <option value="">Select Property</option>
             {properties.map((p) => (
               <option key={p._id} value={p._id}>
