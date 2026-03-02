@@ -11,7 +11,7 @@ import Document from "./models/Document.js";
 import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
-import importProxyRoutes from "./routes/importProxy.routes.js";
+import importProxyRoutes from "../routes/importProxy.routes.js";
 
 
 dotenv.config();
