@@ -1,28 +1,13 @@
-// server/webflow/client.ts
+// server/webflow/client.js
 const WEBFLOW_API_BASE = "https://api.webflow.com/v2";
 
-export type WebflowHttpMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
-
-export type WebflowRequestOptions = {
-  method?: WebflowHttpMethod;
-  headers?: Record<string, string>;
-  body?: unknown;
-};
-
-export type WebflowError = Error & {
-  status?: number;
-  payload?: unknown;
-};
-
 export class WebflowClient {
-  private token: string;
-
-  constructor({ token }: { token: string }) {
+  constructor({ token }) {
     if (!token) throw new Error("Missing Webflow token");
     this.token = token;
   }
 
-  async request<T = unknown>(path: string, opts: WebflowRequestOptions = {}): Promise<T> {
+  async request(path, opts = {}) {
     const { method = "GET", headers = {}, body } = opts;
 
     const res = await fetch(`${WEBFLOW_API_BASE}${path}`, {
@@ -31,7 +16,7 @@ export class WebflowClient {
         Authorization: `Bearer ${this.token}`,
         "Content-Type": "application/json",
         Accept: "application/json",
-        // Webflow Data API v2 uses this header:
+        // Webflow Data API v2 header:
         "accept-version": "2.0.0",
         ...headers,
       },
@@ -40,7 +25,7 @@ export class WebflowClient {
 
     const text = await res.text();
 
-    let json: any = {};
+    let json = {};
     try {
       json = text ? JSON.parse(text) : {};
     } catch {
@@ -49,12 +34,12 @@ export class WebflowClient {
 
     if (!res.ok) {
       const msg = json?.msg || json?.message || `Webflow API error ${res.status}`;
-      const err = new Error(msg) as WebflowError;
+      const err = new Error(msg);
       err.status = res.status;
       err.payload = json;
       throw err;
     }
 
-    return json as T;
+    return json;
   }
 }
