@@ -11,7 +11,7 @@ import Document from "./models/Document.js";
 import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
-import webflowPropertiesRoutes from "./src/routes/webflowpropertiesroutes.ts/index.js";
+import webflowPropertiesRoutes from "./src/routes/webflowpropertiesroutes.ts";
 
 dotenv.config();
 
