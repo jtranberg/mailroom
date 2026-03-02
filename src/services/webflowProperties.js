@@ -1,5 +1,5 @@
 // server/services/webflowProperties.js
-import { WebflowClient } from "../webflow/client.js";
+import { WebflowClient } from "./webflow/client.js";
 
 // Webflow Properties field slugs (adjust if yours differ)
 const FIELDS = {
