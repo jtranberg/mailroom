@@ -44,8 +44,17 @@ export default function AdminDashboard() {
  async function fetchProperties() {
   try {
     const res = await fetch(`${SYNDICATOR_BASE}/api/webflow/properties`);
-    const data = await res.json();
-    if (res.ok) setProperties(Array.isArray(data) ? data : []);
+    const raw = await res.text();
+    let data = {};
+    try { data = JSON.parse(raw); } catch { /* empty */ }
+
+    if (!res.ok) {
+      console.error("PROPERTIES FAIL:", res.status, raw);
+      setStatus(`❌ Properties failed (${res.status}): ${data?.error || raw}`);
+      return;
+    }
+
+    setProperties(Array.isArray(data) ? data : []);
   } catch (err) {
     setStatus(`⚠️ Properties service offline: ${err.message}`);
   }

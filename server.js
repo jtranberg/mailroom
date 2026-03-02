@@ -26,11 +26,11 @@ const allowedOrigins = [
   "http://127.0.0.1:5174",
   "https://mailroom-portal.netlify.app",
   "https://document-portal.netlify.app",
-  "https://document-portal.netlify.app/"
+  "https://document-portal.netlify.app"
 ];
 
-app.use("/api/webflow", webflowPropertiesRoutes);
 
+//middleware
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -44,7 +44,7 @@ app.use(
 app.options(/.*/, cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
+app.use("/api/webflow", webflowPropertiesRoutes);
 // MongoDB Connection...
 mongoose
   .connect(process.env.MONGO_URI)
