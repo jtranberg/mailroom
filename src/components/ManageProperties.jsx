@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 export default function ManageProperties({
   API_BASE,
+  SYNDICATOR_BASE, // ✅ INCORPORATED: pass from AdminDashboard (single source of truth)
   tenants,
   properties,
   setProperties,
@@ -12,10 +13,12 @@ export default function ManageProperties({
   onOpenProperty,
 }) {
   // ✅ IMPORTANT: do NOT fall back to API_BASE (DocuCenter backend)
-  const SYNDICATOR_BASE = import.meta.env.VITE_SYNDICATOR_URL;
+  // ✅ INCORPORATED: prefer prop, but keep env fallback for safety
+  const SYNDICATOR =
+    SYNDICATOR_BASE || import.meta.env.VITE_SYNDICATOR_URL || "";
 
-  if (!SYNDICATOR_BASE) {
-    console.warn("Missing VITE_SYNDICATOR_URL — CSV preview/apply will not work.");
+  if (!SYNDICATOR) {
+    console.warn("Missing VITE_SYNDICATOR_URL — CSV preview/apply + units will not work.");
   }
 
   const [form, setForm] = useState({
@@ -41,6 +44,12 @@ export default function ManageProperties({
   // ✅ Toggle properties list + scroll container
   const [showProperties, setShowProperties] = useState(false);
 
+  // ✅ INCORPORATED: Units panel state
+  const [unitsOpen, setUnitsOpen] = useState(false);
+  const [unitsBusy, setUnitsBusy] = useState(false);
+  const [units, setUnits] = useState([]);
+  const [unitsForProperty, setUnitsForProperty] = useState(null);
+
   const propertyHasTenants = useMemo(() => {
     const map = {};
     for (const p of properties) {
@@ -64,12 +73,68 @@ export default function ManageProperties({
   // ✅ helper: ping syndicator to confirm reachable (health route)
   async function pingSyndicator() {
     try {
-      const url = `${SYNDICATOR_BASE}/api/health`;
+      const url = `${SYNDICATOR}/api/health`;
       console.log("PING:", url);
       const res = await fetch(url);
       return res.ok;
     } catch {
       return false;
+    }
+  }
+
+  // ✅ INCORPORATED: fetch units from SYNDICATOR (not DocuCenter)
+  async function fetchUnitsForProperty(propertyId, propertyName) {
+    if (!SYNDICATOR) {
+      setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
+      return;
+    }
+
+    setUnitsBusy(true);
+    setUnits([]);
+    setUnitsForProperty({ propertyId, propertyName });
+    setUnitsOpen(true);
+    setStatus(`🏠 Loading units for ${propertyName || propertyId}...`);
+
+    try {
+      // Prefer propertyId filter
+      let url =
+        `${SYNDICATOR}/api/webflow/units/search` +
+        `?propertyId=${encodeURIComponent(propertyId)}` +
+        `&max=200`;
+
+      let res = await fetch(url);
+      let { raw, data } = await readResponse(res);
+
+      // Fallback: propertyName filter if server doesn’t support propertyId yet
+      if (!res.ok || (Array.isArray(data?.items) && data.items.length === 0)) {
+        const fallbackUrl =
+          `${SYNDICATOR}/api/webflow/units/search` +
+          `?propertyName=${encodeURIComponent(propertyName || "")}` +
+          `&max=200`;
+
+        console.warn("Units fallback ->", fallbackUrl);
+        res = await fetch(fallbackUrl);
+        ({ raw, data } = await readResponse(res));
+
+        if (!res.ok) {
+          console.error("UNITS FAIL:", res.status, raw);
+          setStatus(`❌ Units failed (${res.status}): ${data?.error || raw}`);
+          return;
+        }
+      }
+
+      const items = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data)
+        ? data
+        : [];
+
+      setUnits(items);
+      setStatus(`✅ Units loaded: ${items.length}`);
+    } catch (err) {
+      setStatus(`❌ Units fetch failed: ${err.message}`);
+    } finally {
+      setUnitsBusy(false);
     }
   }
 
@@ -107,7 +172,7 @@ export default function ManageProperties({
   const handleAddProperty = async (e) => {
     e.preventDefault();
 
-    if (!SYNDICATOR_BASE) {
+    if (!SYNDICATOR) {
       return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
     }
 
@@ -118,7 +183,7 @@ export default function ManageProperties({
     if (!name) return setStatus("❌ Property name is required");
 
     try {
-      const res = await fetch(`${SYNDICATOR_BASE}/api/webflow/properties`, {
+      const res = await fetch(`${SYNDICATOR}/api/webflow/properties`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -146,7 +211,7 @@ export default function ManageProperties({
   const handleDeleteProperty = async (p) => {
     if (propertyHasTenants[p._id]) return;
 
-    if (!SYNDICATOR_BASE) {
+    if (!SYNDICATOR) {
       return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
     }
 
@@ -154,7 +219,7 @@ export default function ManageProperties({
     if (!ok) return;
 
     try {
-      const res = await fetch(`${SYNDICATOR_BASE}/api/webflow/properties/${p._id}`, {
+      const res = await fetch(`${SYNDICATOR}/api/webflow/properties/${p._id}`, {
         method: "DELETE",
         headers: { "x-admin-key": "wallsecure" },
       });
@@ -178,7 +243,7 @@ export default function ManageProperties({
   const handleCsvPreview = async () => {
     setCsvReport(null);
 
-    if (!SYNDICATOR_BASE) {
+    if (!SYNDICATOR) {
       return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
     }
     if (!csvFile) return setStatus("❌ Please choose a CSV file first.");
@@ -201,7 +266,7 @@ export default function ManageProperties({
       fd.append("mode", "update-only");
       fd.append("dryRun", "true");
 
-      const res = await fetch(`${SYNDICATOR_BASE}/api/import/properties/csv`, {
+      const res = await fetch(`${SYNDICATOR}/api/import/properties/csv`, {
         method: "POST",
         headers: { "x-admin-key": "wallsecure" },
         body: fd,
@@ -224,7 +289,9 @@ export default function ManageProperties({
         applied: data?.applied,
       });
 
-      setStatus(`✅ Preview OK — rows: ${data?.summary?.rows ?? "?"} (matchKey: ${data?.summary?.matchKey ?? matchKey})`);
+      setStatus(
+        `✅ Preview OK — rows: ${data?.summary?.rows ?? "?"} (matchKey: ${data?.summary?.matchKey ?? matchKey})`
+      );
     } catch (err) {
       setStatus(`❌ Preview failed: ${err.message}`);
     } finally {
@@ -236,7 +303,7 @@ export default function ManageProperties({
   const handleCsvApplyUpdate = async () => {
     setCsvReport(null);
 
-    if (!SYNDICATOR_BASE) {
+    if (!SYNDICATOR) {
       return setStatus("❌ Missing VITE_SYNDICATOR_URL (points to syndicator backend).");
     }
     if (!csvFile) return setStatus("❌ Please choose a CSV file first.");
@@ -260,7 +327,7 @@ export default function ManageProperties({
       fd.append("mode", "update-only");
       fd.append("dryRun", dryRun ? "true" : "false");
 
-      const res = await fetch(`${SYNDICATOR_BASE}/api/import/properties/csv/apply`, {
+      const res = await fetch(`${SYNDICATOR}/api/import/properties/csv/apply`, {
         method: "POST",
         headers: { "x-admin-key": "wallsecure" },
         body: fd,
@@ -362,7 +429,7 @@ export default function ManageProperties({
           </div>
         )}
 
-        {!SYNDICATOR_BASE && (
+        {!SYNDICATOR && (
           <div className="subtle" style={{ marginTop: 8 }}>
             ⚠️ Missing <b>VITE_SYNDICATOR_URL</b> — set it in Netlify env vars and redeploy.
           </div>
@@ -510,7 +577,7 @@ export default function ManageProperties({
                         <button
                           type="button"
                           className="back-button small"
-                          onClick={() => onOpenProperty?.(p)}
+                          onClick={() => fetchUnitsForProperty(p._id, p.name)} // ✅ INCORPORATED: fetch units from syndicator
                           title="View units for this property"
                         >
                           🏠 View Units
@@ -534,6 +601,57 @@ export default function ManageProperties({
                   );
                 })}
               </ul>
+            </div>
+          )}
+
+          {/* ✅ INCORPORATED: Units panel */}
+          {unitsOpen && (
+            <div className="card" style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>🏠 Units</div>
+                  <div className="subtle">
+                    {unitsForProperty?.propertyName || unitsForProperty?.propertyId}
+                    {unitsBusy ? " — loading..." : ` — ${units.length} found`}
+                  </div>
+                </div>
+
+                <button type="button" className="back-button" onClick={() => setUnitsOpen(false)}>
+                  ✖ Close
+                </button>
+              </div>
+
+              {!unitsBusy && units.length === 0 && (
+                <div className="subtle" style={{ marginTop: 10 }}>
+                  No units returned for this property. (If this is unexpected, your server filter may still be using
+                  propertyName instead of propertyId.)
+                </div>
+              )}
+
+              {!unitsBusy && units.length > 0 && (
+                <div style={{ marginTop: 10, maxHeight: 320, overflow: "auto" }}>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {units.map((u) => {
+                      const fd = u?.fieldData || {};
+                      const unitNo = fd["unit-number"] ?? fd.unitNumber ?? "";
+                      const available = fd.available ?? "";
+                      const rent = fd.rent;
+
+                      return (
+                        <li key={u.id} className="subtle" style={{ marginBottom: 8 }}>
+                          <b>Unit:</b> {String(unitNo || "(no unit #)")} • <b>Avail:</b> {String(available)}
+                          {rent != null ? (
+                            <>
+                              {" "}
+                              • <b>Rent:</b> {String(rent)}
+                            </>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

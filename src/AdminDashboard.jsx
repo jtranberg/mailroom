@@ -34,7 +34,9 @@ export default function AdminDashboard() {
   // ✅ UI warning if env not set
   useEffect(() => {
     if (!import.meta.env.VITE_SYNDICATOR_URL) {
-      console.warn("Missing VITE_SYNDICATOR_URL — properties + CSV import will not work.");
+      console.warn(
+        "Missing VITE_SYNDICATOR_URL — properties + CSV import will not work.",
+      );
     }
   }, []);
 
@@ -85,7 +87,9 @@ export default function AdminDashboard() {
 
       if (!res.ok) {
         console.error("PROPERTIES FAIL:", res.status, raw);
-        setStatus(`❌ Properties failed (${res.status}): ${data?.error || raw}`);
+        setStatus(
+          `❌ Properties failed (${res.status}): ${data?.error || raw}`,
+        );
         return;
       }
 
@@ -151,7 +155,12 @@ export default function AdminDashboard() {
     }
 
     // ✅ duplicate guard (by email across ALL tenants)
-    const exists = tenants.some((t) => String(t.email || "").trim().toLowerCase() === email);
+    const exists = tenants.some(
+      (t) =>
+        String(t.email || "")
+          .trim()
+          .toLowerCase() === email,
+    );
     if (exists) {
       setStatus("⚠️ A tenant with this email already exists.");
       return;
@@ -167,7 +176,9 @@ export default function AdminDashboard() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setStatus(`❌ Add failed: ${data?.error || `Server error (${res.status})`}`);
+        setStatus(
+          `❌ Add failed: ${data?.error || `Server error (${res.status})`}`,
+        );
         return;
       }
 
@@ -195,7 +206,7 @@ export default function AdminDashboard() {
     const propName = propertyById[target.propertyId]?.name || "Unknown";
 
     const ok = window.confirm(
-      `Archive tenant?\n\n${target.name} (${target.email})\nUnit ${target.unit}\nProperty: ${propName}\n\nNotes + emails will be kept.`
+      `Archive tenant?\n\n${target.name} (${target.email})\nUnit ${target.unit}\nProperty: ${propName}\n\nNotes + emails will be kept.`,
     );
     if (!ok) return;
 
@@ -207,7 +218,9 @@ export default function AdminDashboard() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setStatus(`❌ Archive failed: ${data?.error || `Server error (${res.status})`}`);
+        setStatus(
+          `❌ Archive failed: ${data?.error || `Server error (${res.status})`}`,
+        );
         return;
       }
 
@@ -233,7 +246,8 @@ export default function AdminDashboard() {
 
         {!SYNDICATOR_BASE && (
           <p className="status">
-            ⚠️ Missing <b>VITE_SYNDICATOR_URL</b> — properties + CSV import disabled until set in Netlify env vars.
+            ⚠️ Missing <b>VITE_SYNDICATOR_URL</b> — properties + CSV import
+            disabled until set in Netlify env vars.
           </p>
         )}
 
@@ -245,13 +259,23 @@ export default function AdminDashboard() {
             value={type}
             onChange={(e) => setType(e.target.value)}
           />
-          <input type="text" placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} />
-          <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <input
+            type="text"
+            placeholder="Label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+          />
           <button type="submit">📤 Upload Document</button>
         </form>
 
         <ManageProperties
-          API_BASE={API_BASE}
+          API_BASE={API_BASE} // DocuCenter (tenants/docs)
+          SYNDICATOR_BASE={SYNDICATOR_BASE} // Syndicator (webflow props/units/import)
           tenants={tenants}
           properties={properties}
           setProperties={setProperties}
@@ -300,24 +324,35 @@ export default function AdminDashboard() {
             type="text"
             placeholder="Name"
             value={tenantForm.name}
-            onChange={(e) => setTenantForm({ ...tenantForm, name: e.target.value })}
+            onChange={(e) =>
+              setTenantForm({ ...tenantForm, name: e.target.value })
+            }
           />
 
           <input
             type="email"
             placeholder="Email"
             value={tenantForm.email}
-            onChange={(e) => setTenantForm({ ...tenantForm, email: e.target.value })}
+            onChange={(e) =>
+              setTenantForm({ ...tenantForm, email: e.target.value })
+            }
           />
 
           <input
             type="text"
             placeholder="Unit #"
             value={tenantForm.unit}
-            onChange={(e) => setTenantForm({ ...tenantForm, unit: e.target.value })}
+            onChange={(e) =>
+              setTenantForm({ ...tenantForm, unit: e.target.value })
+            }
           />
 
-          <select value={tenantForm.property} onChange={(e) => setTenantForm({ ...tenantForm, property: e.target.value })}>
+          <select
+            value={tenantForm.property}
+            onChange={(e) =>
+              setTenantForm({ ...tenantForm, property: e.target.value })
+            }
+          >
             <option value="">Select Property</option>
             {properties.map((p) => (
               <option key={p._id} value={p._id}>
@@ -328,7 +363,11 @@ export default function AdminDashboard() {
 
           <div className="tenant-actions">
             <button type="submit">➕ Add Tenant</button>
-            <button type="button" className="danger-button" onClick={handleArchiveSelected}>
+            <button
+              type="button"
+              className="danger-button"
+              onClick={handleArchiveSelected}
+            >
               🗑 Archive Selected
             </button>
           </div>
