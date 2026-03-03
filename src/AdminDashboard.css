@@ -269,3 +269,41 @@
     align-items: flex-start;
   }
 }
+.property-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.property-list-scroll {
+  max-height: 420px;
+  overflow: auto;
+  margin-top: 10px;
+  padding-right: 6px;
+}
+
+.property-actions .small {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+.property-list-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.property-list-scroll{
+  max-height: 420px;      /* adjust */
+  overflow-y: auto;
+  padding-right: 6px;      /* avoids scrollbar overlay on content */
+}
+
+.back-button.small,
+.danger-button.small {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}

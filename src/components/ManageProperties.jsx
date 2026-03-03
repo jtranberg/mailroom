@@ -1,3 +1,4 @@
+// src/components/ManageProperties.jsx
 import { useMemo, useState } from "react";
 
 export default function ManageProperties({
@@ -32,12 +33,13 @@ export default function ManageProperties({
   const [csvBusy, setCsvBusy] = useState(false);
 
   // ✅ Syndicator tenantId is NOT the same as Mongo tenant _id.
-  // Your working curl uses tenantId=demo, so default to that.
-  // Later we can make a dropdown if you add more syndicator tenants.
   const [syndicatorTenantId, setSyndicatorTenantId] = useState("demo");
 
   // ✅ Optional: show backend errors/preview rows right in UI
   const [csvReport, setCsvReport] = useState(null);
+
+  // ✅ Toggle properties list + scroll container
+  const [showProperties, setShowProperties] = useState(false);
 
   const propertyHasTenants = useMemo(() => {
     const map = {};
@@ -185,9 +187,6 @@ export default function ManageProperties({
     setCsvBusy(true);
     setStatus("🔎 Previewing Properties CSV…");
 
-    console.log("SYNDICATOR_BASE:", SYNDICATOR_BASE);
-    console.log("Preview URL:", `${SYNDICATOR_BASE}/api/import/properties/csv`);
-
     const reachable = await pingSyndicator();
     if (!reachable) {
       setCsvBusy(false);
@@ -225,9 +224,7 @@ export default function ManageProperties({
         applied: data?.applied,
       });
 
-      setStatus(
-        `✅ Preview OK — rows: ${data?.summary?.rows ?? "?"} (matchKey: ${data?.summary?.matchKey ?? matchKey})`
-      );
+      setStatus(`✅ Preview OK — rows: ${data?.summary?.rows ?? "?"} (matchKey: ${data?.summary?.matchKey ?? matchKey})`);
     } catch (err) {
       setStatus(`❌ Preview failed: ${err.message}`);
     } finally {
@@ -254,8 +251,6 @@ export default function ManageProperties({
 
     setCsvBusy(true);
     setStatus(dryRun ? "🧪 Dry run applying (Properties)..." : "🚀 Applying CSV updates to Webflow (Properties)…");
-
-    console.log("Apply URL:", `${SYNDICATOR_BASE}/api/import/properties/csv/apply`);
 
     try {
       const fd = new FormData();
@@ -305,6 +300,11 @@ export default function ManageProperties({
           }, errors: 0`
         );
       }
+
+      // ✅ refresh list after successful apply (especially when writing)
+      if (!dryRun) {
+        await fetchProperties();
+      }
     } catch (err) {
       setStatus(`❌ Apply failed: ${err.message}`);
     } finally {
@@ -328,7 +328,6 @@ export default function ManageProperties({
         <div className="file-upload" style={{ flexWrap: "wrap" }}>
           <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} />
 
-          {/* ✅ Syndicator tenantId (matches your curl tenantId=demo) */}
           <input
             type="text"
             value={syndicatorTenantId}
@@ -353,7 +352,7 @@ export default function ManageProperties({
           </button>
 
           <button type="button" disabled={csvBusy} onClick={handleCsvApplyUpdate}>
-            ✅ Update Properties
+            {dryRun ? "🧪 Dry Run Update" : "✅ Apply Update"}
           </button>
         </div>
 
@@ -369,7 +368,7 @@ export default function ManageProperties({
           </div>
         )}
 
-        {/* ✅ Show helpful response details (runId, summary, errors) */}
+        {/* ✅ Show helpful response details (runId, summary, errors, missing) */}
         {csvReport && (
           <div style={{ marginTop: 12 }}>
             <div className="subtle">
@@ -408,6 +407,35 @@ export default function ManageProperties({
                 )}
               </div>
             )}
+
+            {!!csvReport?.applied?.missing?.length && (
+              <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "rgba(255,165,0,0.10)" }}>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                  🟧 Missing ({csvReport.applied.missing.length})
+                </div>
+
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {csvReport.applied.missing.slice(0, 5).map((m, idx) => (
+                    <li key={idx} className="subtle" style={{ marginBottom: 6 }}>
+                      <b>Reason:</b> {m?.reason || "No match"} <br />
+                      <b>item_id:</b> {m?.row?.item_id || m?.row?.id || "(none)"}
+                      {m?.row?.name ? (
+                        <>
+                          <br />
+                          <b>name:</b> {m.row.name}
+                        </>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+
+                {csvReport.applied.missing.length > 5 && (
+                  <div className="subtle" style={{ marginTop: 6 }}>
+                    Showing first 5 of {csvReport.applied.missing.length}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -437,48 +465,77 @@ export default function ManageProperties({
         <button type="submit">➕ Add Property</button>
       </form>
 
+      {/* ✅ Properties list toggle + scroll + View Units button */}
       {properties.length > 0 && (
         <div className="property-list">
-          <h4>📍 Properties:</h4>
-          <ul>
-            {properties.map((p) => {
-              const hasTenants = !!propertyHasTenants[p._id];
+          <div className="property-list-head">
+            <h4 style={{ margin: 0 }}>📍 Properties:</h4>
 
-              return (
-                <li key={p._id} className="property-row">
-                  <button
-                    type="button"
-                    className="property-open"
-                    onClick={() => onOpenProperty?.(p)}
-                    title="Open property details"
-                  >
-                    {p.photoUrl && (
-                      <img
-                        src={p.photoUrl}
-                        alt={p.name}
-                        style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 10 }}
-                      />
-                    )}
+            <button type="button" className="back-button" onClick={() => setShowProperties((v) => !v)}>
+              {showProperties ? "🙈 Hide" : "👀 Show"} ({properties.length})
+            </button>
+          </div>
 
-                    <div>
-                      <div style={{ fontWeight: 800 }}>{p.name}</div>
-                      {p.suite && <div className="subtle">Suite: {p.suite}</div>}
-                    </div>
-                  </button>
+          {showProperties && (
+            <div className="property-list-scroll">
+              <ul>
+                {properties.map((p) => {
+                  const hasTenants = !!propertyHasTenants[p._id];
 
-                  <button
-                    type="button"
-                    className="danger-button small"
-                    disabled={hasTenants}
-                    title={hasTenants ? "Cannot delete: tenants still linked to this property" : "Delete property"}
-                    onClick={() => handleDeleteProperty(p)}
-                  >
-                    🗑 Remove
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+                  return (
+                    <li key={p._id} className="property-row">
+                      {/* LEFT: property info (clickable) */}
+                      <button
+                        type="button"
+                        className="property-open"
+                        onClick={() => onOpenProperty?.(p)}
+                        title="Open property details"
+                      >
+                        {p.photoUrl && (
+                          <img
+                            src={p.photoUrl}
+                            alt={p.name}
+                            style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 10 }}
+                          />
+                        )}
+
+                        <div>
+                          <div style={{ fontWeight: 800 }}>{p.name}</div>
+                          {p.suite && <div className="subtle">Suite: {p.suite}</div>}
+                        </div>
+                      </button>
+
+                      {/* RIGHT: actions */}
+                      <div className="property-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="back-button small"
+                          onClick={() => onOpenProperty?.(p)}
+                          title="View units for this property"
+                        >
+                          🏠 View Units
+                        </button>
+
+                        <button
+                          type="button"
+                          className="danger-button small"
+                          disabled={hasTenants}
+                          title={
+                            hasTenants
+                              ? "Cannot delete: tenants still linked to this property"
+                              : "Delete property"
+                          }
+                          onClick={() => handleDeleteProperty(p)}
+                        >
+                          🗑 Remove
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </section>

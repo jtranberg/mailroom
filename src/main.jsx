@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 import AdminDashboard from './AdminDashboard'; // ⬅️ import the component
 import "./App.css"; //
+import PropertyUnits from "./PropertyUnits";
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -12,6 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/admin" element={<AdminDashboard />} /> {/* ⬅️ Route works now */}
+        <Route path="/properties/:id" element={<PropertyUnits />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
