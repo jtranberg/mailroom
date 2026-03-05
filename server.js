@@ -208,17 +208,43 @@ app.post("/api/tenants", async (req, res) => {
     // ✅ accept propertyKey as propertyId (if you ever send it)
     propertyId = propertyId || propertyKey;
 
-    /**
-     * ✅ Deterministic mapping when UI sends propertyName:
-     * If Mongo has duplicate properties with same name,
-     * choose the most recently created one consistently (not random).
-     */
-    if (!propertyId && propertyName) {
-      const prop = await Property.findOne({
-        name: { $regex: new RegExp(`^${String(propertyName).trim()}$`, "i") },
-      }).sort({ createdAt: -1 });
+    const cleanPropertyName = propertyName ? String(propertyName).trim() : "";
 
-      if (prop) propertyId = String(prop._id);
+    // ✅ Verify propertyId is a REAL Mongo Property _id
+    let propById = null;
+    const hasValidObjectId =
+      propertyId && mongoose.Types.ObjectId.isValid(String(propertyId));
+
+    if (hasValidObjectId) {
+      propById = await Property.findById(propertyId);
+    }
+
+    // ✅ If propertyId missing OR invalid OR not found -> map from propertyName
+    if ((!propertyId || !hasValidObjectId || !propById) && cleanPropertyName) {
+      const prop = await Property.findOne({
+        name: { $regex: new RegExp(`^${cleanPropertyName}$`, "i") },
+      }).sort({ createdAt: -1 }); // deterministic if duplicates exist
+
+      if (prop) {
+        propertyId = String(prop._id);
+        propById = prop;
+      }
+    }
+
+    // ✅ Optional: if both provided, but mismatch, override propertyId to match propertyName
+    if (propById && cleanPropertyName) {
+      const mongoName = String(propById.name || "").trim().toLowerCase();
+      const uiName = cleanPropertyName.toLowerCase();
+      if (mongoName && uiName && mongoName !== uiName) {
+        const prop = await Property.findOne({
+          name: { $regex: new RegExp(`^${cleanPropertyName}$`, "i") },
+        }).sort({ createdAt: -1 });
+
+        if (prop) {
+          propertyId = String(prop._id);
+          propById = prop;
+        }
+      }
     }
 
     if (!name || !email || !unit || !propertyId) {
@@ -264,16 +290,16 @@ app.post("/api/tenants", async (req, res) => {
       name,
       email,
       unit,
-      propertyId, // ✅ Mongo Property _id (current storage approach)
-      propertyName: propertyName ? String(propertyName).trim() : undefined,
+      propertyId, // ✅ must be Mongo Property _id now
+      propertyName: cleanPropertyName || undefined,
       isArchived: false,
     });
 
     await newTenant.save();
-    res.status(201).json({ message: "✅ Tenant added", tenant: newTenant });
+    return res.status(201).json({ message: "✅ Tenant added", tenant: newTenant });
   } catch (err) {
     console.error("❌ Failed to add tenant:", err);
-    res.status(500).json({ error: "Failed to add tenant", details: err.message });
+    return res.status(500).json({ error: "Failed to add tenant", details: err.message });
   }
 });
 
