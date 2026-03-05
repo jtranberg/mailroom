@@ -13,6 +13,8 @@ import Property from "./models/Property.js";
 import Note from "./models/Note.js";
 import importProxyRoutes from "./src/routes/webflowproperties.routes.js";
 
+import Message from "./models/Message.js";
+
 
 dotenv.config();
 
@@ -121,6 +123,57 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
   }
 });
 
+// messages
+
+// GET: messages (global inbox + filters)
+// /api/messages?propertyKey=...&propertyName=...&tenantId=...&to=...&limit=50
+app.get("/api/messages", async (req, res) => {
+  try {
+    const {
+      propertyKey,
+      propertyName,
+      tenantId,
+      to,
+      from,
+      q, // text search (subject/message)
+    } = req.query;
+
+    let limit = parseInt(String(req.query.limit || "50"), 10);
+    if (Number.isNaN(limit) || limit < 1) limit = 50;
+    limit = Math.min(limit, 200);
+
+    const filter = {};
+
+    if (propertyKey) filter.propertyKey = String(propertyKey);
+    if (propertyName) filter.propertyName = String(propertyName);
+    if (tenantId) filter.tenantId = String(tenantId);
+
+    if (to) filter.to = String(to).toLowerCase();
+    if (from) filter.from = String(from).toLowerCase();
+
+    if (q) {
+      const s = String(q).trim();
+      if (s) {
+        filter.$or = [
+          { subject: { $regex: s, $options: "i" } },
+          { message: { $regex: s, $options: "i" } },
+          { to: { $regex: s, $options: "i" } },
+          { from: { $regex: s, $options: "i" } },
+          { tenantName: { $regex: s, $options: "i" } },
+          { propertyName: { $regex: s, $options: "i" } },
+        ];
+      }
+    }
+
+    const items = await Message.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const count = await Message.countDocuments(filter);
+
+    res.status(200).json({ count, items });
+  } catch (err) {
+    console.error("❌ Failed to fetch messages:", err);
+    res.status(500).json({ error: "Failed to fetch messages", details: err.message });
+  }
+});
 /* =========================================================
    TENANTS
 ========================================================= */
