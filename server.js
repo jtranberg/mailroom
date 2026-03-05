@@ -417,6 +417,26 @@ app.delete("/api/notes/:noteId", async (req, res) => {
     res.status(500).json({ error: "Failed to delete note", details: err.message });
   }
 });
+// PATCH: restore (un-archive) tenant. Notes stay forever.
+app.patch("/api/tenants/:tenantId/restore", async (req, res) => {
+  try {
+    const { tenantId } = req.params;
+
+    const t = await Tenant.findById(tenantId);
+    if (!t) return res.status(404).json({ error: "Tenant not found" });
+
+    t.isArchived = false;
+    t.archivedAt = null;
+    t.archivedReason = null;
+
+    await t.save();
+
+    return res.status(200).json({ message: "✅ Tenant restored", tenant: t });
+  } catch (err) {
+    console.error("❌ Failed to restore tenant:", err);
+    return res.status(500).json({ error: "Failed to restore tenant", details: err.message });
+  }
+});
 
 // Start server
 app.listen(PORT, () => {
