@@ -15,6 +15,7 @@ import Message from "./models/Message.js";
 
 import importProxyRoutes from "./src/routes/webflowproperties.routes.js";
 
+
 dotenv.config();
 
 const app = express();
@@ -43,12 +44,10 @@ app.use(
 app.options(/.*/, cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
-/**
- * ✅ Webflow proxy routes live here (keeps Mongo routes clean)
- * Example: /api/webflow/properties
- */
 app.use("/api/webflow", importProxyRoutes);
+
+
+
 
 // MongoDB Connection...
 mongoose
@@ -110,6 +109,48 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
   }
 });
 
+
+// SEARCH: tenants globally (active + archived if requested)
+// Example: /api/tenants/search?q=brenda&includeArchived=true
+app.get("/api/tenants/search", async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    const includeArchived = ["1", "true", "yes"].includes(
+      String(req.query.includeArchived || "").toLowerCase()
+    );
+
+    let limit = parseInt(String(req.query.limit || "25"), 10);
+    if (Number.isNaN(limit) || limit < 1) limit = 25;
+    limit = Math.min(limit, 100);
+
+    if (!q) {
+      return res.status(200).json({ count: 0, items: [] });
+    }
+
+    const rx = new RegExp(q, "i");
+
+    const filter = {
+      ...(includeArchived ? {} : { isArchived: { $ne: true } }),
+      $or: [
+        { name: rx },
+        { email: rx },
+        { unit: rx },
+        { propertyName: rx },
+      ],
+    };
+
+    const items = await Tenant.find(filter)
+      .sort({ updatedAt: -1 })
+      .limit(limit);
+
+    const count = await Tenant.countDocuments(filter);
+
+    res.status(200).json({ count, items });
+  } catch (err) {
+    console.error("❌ Tenant search failed:", err);
+    res.status(500).json({ error: "Search failed", details: err.message });
+  }
+});
 /* =========================================================
    MESSAGES (Mongo "email log")
 ========================================================= */
@@ -343,6 +384,8 @@ app.patch("/api/tenants/:tenantId/restore", async (req, res) => {
     return res.status(500).json({ error: "Failed to restore tenant", details: err.message });
   }
 });
+
+
 
 /* =========================================================
    PROPERTIES (Mongo internal list)
