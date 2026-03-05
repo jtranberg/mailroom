@@ -439,6 +439,15 @@ app.get("/api/debug/tenants", async (req, res) => {
   }
 });
 
+app.get("/api/debug/property-by-name", async (req, res) => {
+  const name = String(req.query.name || "").trim();
+  const props = await Property.find({
+    name: { $regex: new RegExp(`^${name}$`, "i") },
+  }).sort({ createdAt: -1 });
+
+  res.json(props.map(p => ({ _id: String(p._id), name: p.name, createdAt: p.createdAt })));
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
