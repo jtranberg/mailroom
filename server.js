@@ -128,8 +128,32 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
 // GET: tenants (ACTIVE by default). Add ?includeArchived=true for all.
 app.get("/api/tenants", async (req, res) => {
   try {
-    const includeArchived = String(req.query.includeArchived || "") === "true";
-    const filter = includeArchived ? {} : { isArchived: { $ne: true } };
+    const includeArchived = ["1", "true", "yes"].includes(
+      String(req.query.includeArchived || "").toLowerCase()
+    );
+
+    const propertyName = String(req.query.propertyName || "").trim();
+    const propertyId = String(req.query.propertyId || "").trim();
+
+    const filter = {};
+    if (!includeArchived) filter.isArchived = { $ne: true };
+
+    // ✅ If the UI sends a propertyName (from Webflow), translate it to the Mongo Property _id
+    if (propertyName) {
+      const prop = await Property.findOne({
+        name: { $regex: new RegExp(`^${propertyName}$`, "i") }, // case-insensitive exact match
+      });
+
+      if (!prop) {
+        // No such property in Mongo -> return empty list (keeps UI predictable)
+        return res.status(200).json([]);
+      }
+
+      filter.propertyId = String(prop._id);
+    }
+
+    // ✅ If propertyId explicitly provided, use it
+    if (propertyId) filter.propertyId = propertyId;
 
     const tenants = await Tenant.find(filter).sort({ createdAt: -1 });
     res.status(200).json(tenants);
