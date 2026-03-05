@@ -112,6 +112,8 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
 
 // SEARCH: tenants globally (active + archived if requested)
 // Example: /api/tenants/search?q=brenda&includeArchived=true
+// SEARCH: tenants globally (active + archived if requested)
+// Example: /api/tenants/search?q=brenda&includeArchived=true
 app.get("/api/tenants/search", async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
@@ -123,34 +125,54 @@ app.get("/api/tenants/search", async (req, res) => {
     if (Number.isNaN(limit) || limit < 1) limit = 25;
     limit = Math.min(limit, 100);
 
-    if (!q) {
-      return res.status(200).json({ count: 0, items: [] });
-    }
+    if (!q) return res.status(200).json({ count: 0, items: [] });
 
     const rx = new RegExp(q, "i");
 
     const filter = {
       ...(includeArchived ? {} : { isArchived: { $ne: true } }),
-      $or: [
-        { name: rx },
-        { email: rx },
-        { unit: rx },
-        { propertyName: rx },
-      ],
+      $or: [{ name: rx }, { email: rx }, { unit: rx }, { propertyName: rx }],
     };
 
-    const items = await Tenant.find(filter)
-      .sort({ updatedAt: -1 })
-      .limit(limit);
-
+    const itemsRaw = await Tenant.find(filter).sort({ updatedAt: -1 }).limit(limit);
     const count = await Tenant.countDocuments(filter);
 
-    res.status(200).json({ count, items });
+    // ✅ Enrich: propertyId -> Property.name
+    const propertyIds = [
+      ...new Set(
+        itemsRaw
+          .map((t) => String(t.propertyId || ""))
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      ),
+    ];
+
+    const props = propertyIds.length
+      ? await Property.find({ _id: { $in: propertyIds } })
+      : [];
+
+    const propNameById = new Map(props.map((p) => [String(p._id), String(p.name || "").trim()]));
+
+    const items = itemsRaw.map((t) => {
+      const obj = t.toObject ? t.toObject() : t;
+
+      // If tenant already has propertyName stored, keep it.
+      // Otherwise fill from Mongo Property collection.
+      const resolvedName =
+        obj.propertyName ||
+        propNameById.get(String(obj.propertyId || "")) ||
+        undefined;
+
+      return { ...obj, propertyName: resolvedName };
+    });
+
+    return res.status(200).json({ count, items });
   } catch (err) {
     console.error("❌ Tenant search failed:", err);
-    res.status(500).json({ error: "Search failed", details: err.message });
+    return res.status(500).json({ error: "Search failed", details: err.message });
   }
 });
+
+
 /* =========================================================
    MESSAGES (Mongo "email log")
 ========================================================= */
