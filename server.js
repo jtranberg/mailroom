@@ -11,10 +11,9 @@ import Document from "./models/Document.js";
 import Tenant from "./models/Tenant.js";
 import Property from "./models/Property.js";
 import Note from "./models/Note.js";
-import importProxyRoutes from "./src/routes/webflowproperties.routes.js";
-
 import Message from "./models/Message.js";
 
+import importProxyRoutes from "./src/routes/webflowproperties.routes.js";
 
 dotenv.config();
 
@@ -29,11 +28,8 @@ const allowedOrigins = [
   "http://127.0.0.1:5174",
   "https://mailroom-portal.netlify.app",
   "https://document-portal.netlify.app",
-  "https://document-portal.netlify.app"
 ];
 
-
-//middleware
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -47,7 +43,12 @@ app.use(
 app.options(/.*/, cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-app.use("/api", importProxyRoutes);
+
+/**
+ * ✅ Webflow proxy routes live here (keeps Mongo routes clean)
+ * Example: /api/webflow/properties
+ */
+app.use("/api/webflow", importProxyRoutes);
 
 // MongoDB Connection...
 mongoose
@@ -71,22 +72,10 @@ app.get("/", (req, res) => {
   res.send("📄 Documents API is running...");
 });
 
-// Seed database with sample documents
-// app.get("/api/seed", async (req, res) => {
-//   try {
-//     await Document.deleteMany();
-//     const inserted = await Document.insertMany([
-//       { type: "lease", label: "Lease Agreement" },
-//       { type: "maintenance", label: "Maintenance Request" },
-//       { type: "inspection", label: "Inspection Form" },
-//     ]);
-//     res.status(201).json({ message: "✅ Seeded documents", inserted });
-//   } catch (err) {
-//     res.status(500).json({ error: "Failed to seed documents", details: err.message });
-//   }
-// });
+/* =========================================================
+   DOCUMENTS
+========================================================= */
 
-// GET: Fetch all documents
 app.get("/api/documents", async (req, res) => {
   try {
     const docs = await Document.find();
@@ -96,7 +85,6 @@ app.get("/api/documents", async (req, res) => {
   }
 });
 
-// POST: Upload document with file
 app.post("/api/documents", upload.single("file"), async (req, res) => {
   try {
     const { type, label } = req.body;
@@ -122,20 +110,14 @@ app.post("/api/documents", upload.single("file"), async (req, res) => {
   }
 });
 
-// messages
+/* =========================================================
+   MESSAGES (Mongo "email log")
+========================================================= */
 
-// GET: messages (global inbox + filters)
-// /api/messages?propertyKey=...&propertyName=...&tenantId=...&to=...&limit=50
+// GET: /api/messages?propertyName=...&tenantId=...&limit=50
 app.get("/api/messages", async (req, res) => {
   try {
-    const {
-      propertyKey,
-      propertyName,
-      tenantId,
-      to,
-      from,
-      q, // text search (subject/message)
-    } = req.query;
+    const { propertyKey, propertyName, tenantId, to, from, q } = req.query;
 
     let limit = parseInt(String(req.query.limit || "50"), 10);
     if (Number.isNaN(limit) || limit < 1) limit = 50;
@@ -173,11 +155,13 @@ app.get("/api/messages", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch messages", details: err.message });
   }
 });
+
 /* =========================================================
    TENANTS
 ========================================================= */
 
 // GET: tenants (ACTIVE by default). Add ?includeArchived=true for all.
+// Supports: ?propertyName=Shannon%20Mews OR ?propertyId=<mongoId>
 app.get("/api/tenants", async (req, res) => {
   try {
     const includeArchived = ["1", "true", "yes"].includes(
@@ -190,21 +174,22 @@ app.get("/api/tenants", async (req, res) => {
     const filter = {};
     if (!includeArchived) filter.isArchived = { $ne: true };
 
-    // ✅ If the UI sends a propertyName (from Webflow), translate it to the Mongo Property _id
+    /**
+     * ✅ CRITICAL FIX:
+     * If there are duplicate Property rows in Mongo with the same name,
+     * we must match ALL of them so tenants don't "disappear".
+     */
     if (propertyName) {
-      const prop = await Property.findOne({
-        name: { $regex: new RegExp(`^${propertyName}$`, "i") }, // case-insensitive exact match
+      const props = await Property.find({
+        name: { $regex: new RegExp(`^${propertyName}$`, "i") }, // exact, case-insensitive
       });
 
-      if (!prop) {
-        // No such property in Mongo -> return empty list (keeps UI predictable)
-        return res.status(200).json([]);
-      }
+      if (!props.length) return res.status(200).json([]);
 
-      filter.propertyId = String(prop._id);
+      const ids = props.map((p) => String(p._id));
+      filter.propertyId = { $in: ids };
     }
 
-    // ✅ If propertyId explicitly provided, use it
     if (propertyId) filter.propertyId = propertyId;
 
     const tenants = await Tenant.find(filter).sort({ createdAt: -1 });
@@ -220,18 +205,21 @@ app.post("/api/tenants", async (req, res) => {
   try {
     let { name, email, unit, propertyId, propertyKey, propertyName } = req.body;
 
-    // ✅ accept propertyKey as propertyId (Webflow/Syndicator properties)
+    // ✅ accept propertyKey as propertyId (if you ever send it)
     propertyId = propertyId || propertyKey;
-    // ✅ If propertyId still missing but propertyName exists, map propertyName -> Mongo Property._id
-if (!propertyId && propertyName) {
-  const prop = await Property.findOne({
-    name: { $regex: new RegExp(`^${String(propertyName).trim()}$`, "i") }, // case-insensitive exact match
-  });
 
-  if (prop) {
-    propertyId = String(prop._id);
-  }
-}
+    /**
+     * ✅ Deterministic mapping when UI sends propertyName:
+     * If Mongo has duplicate properties with same name,
+     * choose the most recently created one consistently (not random).
+     */
+    if (!propertyId && propertyName) {
+      const prop = await Property.findOne({
+        name: { $regex: new RegExp(`^${String(propertyName).trim()}$`, "i") },
+      }).sort({ createdAt: -1 });
+
+      if (prop) propertyId = String(prop._id);
+    }
 
     if (!name || !email || !unit || !propertyId) {
       return res.status(400).json({
@@ -276,8 +264,8 @@ if (!propertyId && propertyName) {
       name,
       email,
       unit,
-      propertyId,                 // ✅ stores Webflow propertyKey (stable)
-      propertyName: propertyName ? String(propertyName).trim() : undefined, // ✅ optional but super helpful
+      propertyId, // ✅ Mongo Property _id (current storage approach)
+      propertyName: propertyName ? String(propertyName).trim() : undefined,
       isArchived: false,
     });
 
@@ -310,94 +298,30 @@ app.delete("/api/tenants/:tenantId", async (req, res) => {
   }
 });
 
-/* =========================================================
-   PROPERTIES
-========================================================= */
-/* =========================================================
-   REPAIR: TENANT propertyId (name -> ObjectId)
-   Admin-only (simple key)
-   POST /api/repair/tenant-property-ids
-========================================================= */
-
-app.post("/api/repair/tenant-property-ids", async (req, res) => {
+// PATCH: restore tenant
+app.patch("/api/tenants/:tenantId/restore", async (req, res) => {
   try {
-    const adminKey = String(req.headers["x-admin-key"] || "");
-    const expectedKey = process.env.ADMIN_KEY || "wallsecure"; // keep same as your UI secret for now
+    const { tenantId } = req.params;
 
-    if (adminKey !== expectedKey) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const t = await Tenant.findById(tenantId);
+    if (!t) return res.status(404).json({ error: "Tenant not found" });
 
-    // Load properties once
-    const properties = await Property.find();
-    const propertyById = new Map(properties.map((p) => [String(p._id), p]));
-    const propertyIdByName = new Map(
-      properties.map((p) => [String(p.name || "").trim().toLowerCase(), String(p._id)])
-    );
+    t.isArchived = false;
+    t.archivedAt = null;
+    t.archivedReason = null;
 
-    // Fetch tenants (include archived too, so everything gets repaired)
-    const tenants = await Tenant.find({});
-
-    const updated = [];
-    const unresolved = [];
-    const skipped = [];
-
-    for (const t of tenants) {
-      const raw = String(t.propertyId || "").trim();
-      if (!raw) {
-        skipped.push({ tenantId: String(t._id), reason: "empty propertyId" });
-        continue;
-      }
-
-      // Case A: already points to a real property _id
-      if (propertyById.has(raw)) {
-        skipped.push({ tenantId: String(t._id), reason: "already valid propertyId" });
-        continue;
-      }
-
-      // Case B: propertyId is actually a property NAME (old data)
-      const mappedId = propertyIdByName.get(raw.toLowerCase());
-      if (mappedId && propertyById.has(mappedId)) {
-        t.propertyId = mappedId;
-        await t.save();
-
-        updated.push({
-          tenantId: String(t._id),
-          tenantEmail: t.email,
-          from: raw,
-          to: mappedId,
-          propertyName: propertyById.get(mappedId)?.name || null,
-        });
-        continue;
-      }
-
-      // Case C: orphan / no match
-      unresolved.push({
-        tenantId: String(t._id),
-        tenantEmail: t.email,
-        propertyId: raw,
-      });
-    }
-
-    return res.status(200).json({
-      message: "✅ Repair complete",
-      counts: {
-        totalTenants: tenants.length,
-        updated: updated.length,
-        skipped: skipped.length,
-        unresolved: unresolved.length,
-      },
-      updated,
-      unresolved,
-      skipped,
-    });
+    await t.save();
+    return res.status(200).json({ message: "✅ Tenant restored", tenant: t });
   } catch (err) {
-    console.error("❌ Repair failed:", err);
-    return res.status(500).json({ error: "Repair failed", details: err.message });
+    console.error("❌ Failed to restore tenant:", err);
+    return res.status(500).json({ error: "Failed to restore tenant", details: err.message });
   }
 });
 
-// POST: Add new property
+/* =========================================================
+   PROPERTIES (Mongo internal list)
+========================================================= */
+
 app.post("/api/properties", async (req, res) => {
   try {
     const { name } = req.body;
@@ -413,7 +337,6 @@ app.post("/api/properties", async (req, res) => {
   }
 });
 
-// GET: Fetch all properties
 app.get("/api/properties", async (req, res) => {
   try {
     const properties = await Property.find();
@@ -423,7 +346,7 @@ app.get("/api/properties", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch properties", details: err.message });
   }
 });
-// DELETE: Remove property ONLY if no ACTIVE tenants are attached
+
 app.delete("/api/properties/:propertyId", async (req, res) => {
   try {
     const { propertyId } = req.params;
@@ -431,7 +354,6 @@ app.delete("/api/properties/:propertyId", async (req, res) => {
     const prop = await Property.findById(propertyId);
     if (!prop) return res.status(404).json({ error: "Property not found" });
 
-    // Block deletion if any ACTIVE tenants still reference this property
     const activeTenantCount = await Tenant.countDocuments({
       propertyId,
       isArchived: { $ne: true },
@@ -455,11 +377,9 @@ app.delete("/api/properties/:propertyId", async (req, res) => {
 });
 
 /* =========================================================
-   NOTES (Admin-only, internal)
+   NOTES
 ========================================================= */
 
-
-// GET: Fetch notes for a tenant (works for active OR archived)
 app.get("/api/tenants/:tenantId/notes", async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -470,19 +390,7 @@ app.get("/api/tenants/:tenantId/notes", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch notes", details: err.message });
   }
 });
-// DEBUG: show every tenant in MongoDB
-app.get("/api/debug/tenants", async (req, res) => {
-  try {
-    const tenants = await Tenant.find().sort({ createdAt: -1 });
-    res.json(tenants);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-
-
-// POST: Add a note for a tenant
 app.post("/api/tenants/:tenantId/notes", async (req, res) => {
   try {
     const { tenantId } = req.params;
@@ -507,7 +415,6 @@ app.post("/api/tenants/:tenantId/notes", async (req, res) => {
   }
 });
 
-// DELETE: Delete a note
 app.delete("/api/notes/:noteId", async (req, res) => {
   try {
     const { noteId } = req.params;
@@ -521,24 +428,14 @@ app.delete("/api/notes/:noteId", async (req, res) => {
     res.status(500).json({ error: "Failed to delete note", details: err.message });
   }
 });
-// PATCH: restore (un-archive) tenant. Notes stay forever.
-app.patch("/api/tenants/:tenantId/restore", async (req, res) => {
+
+// DEBUG: show every tenant in MongoDB
+app.get("/api/debug/tenants", async (req, res) => {
   try {
-    const { tenantId } = req.params;
-
-    const t = await Tenant.findById(tenantId);
-    if (!t) return res.status(404).json({ error: "Tenant not found" });
-
-    t.isArchived = false;
-    t.archivedAt = null;
-    t.archivedReason = null;
-
-    await t.save();
-
-    return res.status(200).json({ message: "✅ Tenant restored", tenant: t });
+    const tenants = await Tenant.find().sort({ createdAt: -1 });
+    res.json(tenants);
   } catch (err) {
-    console.error("❌ Failed to restore tenant:", err);
-    return res.status(500).json({ error: "Failed to restore tenant", details: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
