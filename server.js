@@ -13,6 +13,10 @@ import Property from "./models/Property.js";
 import Note from "./models/Note.js";
 import Message from "./models/Message.js";
 
+
+import { Resend } from "resend";
+
+
 import importProxyRoutes from "./src/routes/webflowproperties.routes.js";
 
 
@@ -20,7 +24,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
+const resend = new Resend(process.env.RESEND_API_KEY);
 // Middleware
 const allowedOrigins = [
   "http://localhost:5173",
@@ -71,6 +75,47 @@ app.get("/", (req, res) => {
   res.send("📄 Documents API is running...");
 });
 
+
+
+
+// mail
+
+
+
+
+
+app.post("/api/messages", async (req, res) => {
+  try {
+    const { to, subject, message, from, sendFrom } = req.body || {};
+
+    if (!to || !subject || !message) {
+      return res.status(400).json({ error: "Missing to, subject, or message" });
+    }
+
+    // ✅ safe sender until domain verified (or override via sendFrom)
+    const safeFrom = String(sendFrom || "onboarding@resend.dev").trim();
+
+    await resend.emails.send({
+  from: safeFrom,
+  to: [String(to).trim()],
+  subject: String(subject),
+  text: String(message),
+  replyTo: from ? String(from).trim() : undefined,
+});
+
+    // ✅ log keeps your original req.body.from (Wall display sender)
+    const log = new Message({
+      ...req.body,
+      sentFrom: safeFrom,             // optional: store what actually sent
+    });
+    await log.save();
+
+    return res.status(200).json({ message: "Email sent and logged", sentFrom: safeFrom });
+  } catch (err) {
+    console.error("❌ Email send failed:", err);
+    return res.status(500).json({ error: "Email failed", details: err.message });
+  }
+});
 /* =========================================================
    DOCUMENTS
 ========================================================= */
