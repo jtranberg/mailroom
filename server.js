@@ -378,6 +378,15 @@ app.get("/api/tenants/:tenantId/notes", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch notes", details: err.message });
   }
 });
+// DEBUG: show every tenant in MongoDB
+app.get("/api/debug/tenants", async (req, res) => {
+  try {
+    const tenants = await Tenant.find().sort({ createdAt: -1 });
+    res.json(tenants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 
