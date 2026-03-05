@@ -142,7 +142,8 @@ app.get("/api/tenants", async (req, res) => {
 // POST: Add new tenant (blocks duplicates, warns on archived matches)
 app.post("/api/tenants", async (req, res) => {
   try {
-    let { name, email, unit, propertyId } = req.body;
+    // ✅ accept propertyName too (comes from Syndicator/Webflow property object)
+    let { name, email, unit, propertyId, propertyName } = req.body;
 
     if (!name || !email || !unit || !propertyId) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -150,7 +151,8 @@ app.post("/api/tenants", async (req, res) => {
 
     name = String(name).trim();
     unit = String(unit).trim();
-    propertyId = String(propertyId).trim();
+    propertyId = String(propertyId).trim();                 // ✅ should be Webflow property id
+    propertyName = String(propertyName || "").trim();       // ✅ friendly label (optional but important)
     email = String(email).trim().toLowerCase();
 
     const existing = await Tenant.findOne({ email });
@@ -182,7 +184,8 @@ app.post("/api/tenants", async (req, res) => {
       name,
       email,
       unit,
-      propertyId,
+      propertyId,       // ✅ Webflow/Syndicator property ID
+      propertyName,     // ✅ Webflow/Syndicator property NAME (helps filtering + debugging)
       isArchived: false,
     });
 
