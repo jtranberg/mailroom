@@ -222,6 +222,16 @@ app.post("/api/tenants", async (req, res) => {
 
     // ✅ accept propertyKey as propertyId (Webflow/Syndicator properties)
     propertyId = propertyId || propertyKey;
+    // ✅ If propertyId still missing but propertyName exists, map propertyName -> Mongo Property._id
+if (!propertyId && propertyName) {
+  const prop = await Property.findOne({
+    name: { $regex: new RegExp(`^${String(propertyName).trim()}$`, "i") }, // case-insensitive exact match
+  });
+
+  if (prop) {
+    propertyId = String(prop._id);
+  }
+}
 
     if (!name || !email || !unit || !propertyId) {
       return res.status(400).json({
