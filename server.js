@@ -219,25 +219,32 @@ app.get("/api/tenants", async (req, res) => {
 // POST: Add new tenant (blocks duplicates, warns on archived matches)
 app.post("/api/tenants", async (req, res) => {
   try {
-    // ✅ accept propertyName too (comes from Syndicator/Webflow property object)
-    let { name, email, unit, propertyId, propertyName } = req.body;
+    let { name, email, unit, propertyId, propertyKey, propertyName } = req.body;
+
+    // ✅ accept propertyKey as propertyId (Webflow/Syndicator properties)
+    propertyId = propertyId || propertyKey;
 
     if (!name || !email || !unit || !propertyId) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({
+        error: "Missing required fields",
+        missing: {
+          name: !name,
+          email: !email,
+          unit: !unit,
+          propertyId: !propertyId,
+        },
+      });
     }
 
     name = String(name).trim();
     unit = String(unit).trim();
-    propertyId = String(propertyId).trim();                 // ✅ should be Webflow property id
-    propertyName = String(propertyName || "").trim();       // ✅ friendly label (optional but important)
+    propertyId = String(propertyId).trim();
     email = String(email).trim().toLowerCase();
 
     const existing = await Tenant.findOne({ email });
 
-    // ✅ archived match: warn + tell UI notes exist
     if (existing && existing.isArchived) {
       const noteCount = await Note.countDocuments({ tenantId: existing._id });
-
       return res.status(409).json({
         error: "This email belongs to a previous tenant. Review notes before re-adding.",
         code: "PREVIOUS_TENANT",
@@ -248,7 +255,6 @@ app.post("/api/tenants", async (req, res) => {
       });
     }
 
-    // ✅ active duplicate
     if (existing && !existing.isArchived) {
       return res.status(409).json({
         error: "Tenant email already exists.",
@@ -261,8 +267,8 @@ app.post("/api/tenants", async (req, res) => {
       name,
       email,
       unit,
-      propertyId,       // ✅ Webflow/Syndicator property ID
-      propertyName,     // ✅ Webflow/Syndicator property NAME (helps filtering + debugging)
+      propertyId,                 // ✅ stores Webflow propertyKey (stable)
+      propertyName: propertyName ? String(propertyName).trim() : undefined, // ✅ optional but super helpful
       isArchived: false,
     });
 
